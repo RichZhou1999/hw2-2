@@ -24,6 +24,8 @@ The idea of this mpi code:
 #include <unordered_map>
 #include <iostream>
 #include <bits/stdc++.h>
+#include <fstream>
+#include <sstream>
 
                                  std::unordered_map<int, std::unordered_set<particle_t *>> bins;
 std::unordered_map<int, int> particle_to_bin;
@@ -70,7 +72,7 @@ int step = 0;
 
 
 int calculate_bin_number(double x, double y, double size, double bin_size, int row_lda, int column_lda){
-    if ((y < upper_boundary)){
+    if ((y <= upper_boundary)){
         return -1;
     }
     if (( y > lower_boundary)){
@@ -372,20 +374,41 @@ void init_simulation(particle_t* parts, int num_parts, double size, int rank, in
     upper_boundary = zone_size * rank;
     lower_boundary = zone_size * (rank + 1);
 
+    // std::cout<<"upper_boundary" <<upper_boundary << "rank" << rank << "\n";
+    // std::cout<<"lower_boundary" <<lower_boundary << "rank" << rank << "\n";
     const int space = ceil(1.5 * bin_size * bin_size * 1. / density);
     for(int i = 0; i< row_lda*column_lda; ++i){
         bins[i].reserve(space);
     }
+    // std::ofstream myfile;
 
+    // std::ostringstream oss;
+    // oss << "example" << rank << ".txt";
+    // std::string name = oss.str();
+
+    // myfile.open (name);
     for (int i = 0; i < num_parts; ++i){
         int index;
         index = calculate_bin_number(parts[i].x,parts[i].y, size, bin_size, row_lda, column_lda);
+        // myfile<<" y " << parts[i].y <<  " rank " << rank << " index " << index << "\n";
         if (index >= 0){
             bins[index].insert(&parts[i]);
         }
         // bins[index].insert(&parts[i]);
         // particle_to_bin[parts[i].id] = index;
     }
+    // myfile.close();
+
+    number_particles_sending = 0;
+    for( int i =0 ; i < row_lda; i++){
+        for( int j =0; j < column_lda; j++){
+            for (auto it = bins[j+i*column_lda].begin(); it != bins[j+i*column_lda].end(); ++it){
+                number_particles_sending+=1;
+            }
+        }
+    }
+    // std::cout << "rank "<<rank<< "num" << number_particles_sending << "\n";
+
     update_boundary_particles();
     send_recv_boundary_particles(rank, num_procs);
     // if(rank != (num_procs -1)){
@@ -851,7 +874,7 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
                     number_particles_sending,
                     PARTICLE,
                     &particle_receive_gathering[0],
-                    number_particles_receiving,
+                    &number_particles_receiving[0],
                     &displacement[0],
                     PARTICLE,
                     0,
@@ -859,7 +882,8 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
         for( int i =0; i < num_parts; i++){
             parts[particle_receive_gathering[i].id-1] = particle_receive_gathering[i];
         }
-    } else{
+    }
+    else{
         MPI_Gatherv(&particle_send_gathering[0],
                     number_particles_sending,
                     PARTICLE,
