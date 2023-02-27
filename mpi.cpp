@@ -72,10 +72,10 @@ int step = 0;
 
 
 int calculate_bin_number(double x, double y, double size, double bin_size, int row_lda, int column_lda){
-    if ((y <= upper_boundary)){
+    if ((y < upper_boundary)){
         return -1;
     }
-    if (( y > lower_boundary)){
+    if (( y >= lower_boundary)){
         return -2;
     }
     y = y - upper_boundary;
@@ -546,7 +546,7 @@ void apply_force_bins_upper_boundary(int row, int column){
     apply_force_bin(row, column, row + 1, column);
     // bottom right neighbor
     apply_force_bin(row, column, row + 1, column + 1);
-    apply_force_bin_upper_boundary(row, column, row - 1, column);
+    apply_force_bin_upper_boundary(row, column, row, column);
 }
 
 void apply_force_bins_lower_boundary(int row, int column){
@@ -556,7 +556,7 @@ void apply_force_bins_lower_boundary(int row, int column){
     apply_force_bin_self(row, column, row, column);
     // right neighbor
     apply_force_bin(row, column, row, column + 1);
-    apply_force_bin_lower_boundary(row, column, row +1, column);
+    apply_force_bin_lower_boundary(row, column, row, column);
 }
 void update_flatten_particles(){
     flatten_particles.clear();
@@ -604,6 +604,12 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
     for( int j =0; j < column_lda; j++){
         apply_force_bins_upper_boundary(0,j);
         apply_force_bins_lower_boundary(row_lda-1,j);
+    }
+
+
+    for( int j =0; j < column_lda; j++){
+        apply_force_bin_upper_boundary(1, j, 1, j);
+        apply_force_bin_lower_boundary(row_lda-2, j, row_lda-2, j);
     }
 
     // for (int i = 0; i < num_parts; ++i) {
