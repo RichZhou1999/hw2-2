@@ -30,7 +30,7 @@ The idea of this mpi code:
                                  std::unordered_map<int, std::unordered_set<particle_t *>> bins;
 std::unordered_map<int, int> particle_to_bin;
 double zone_size;
-double bin_size = 3*cutoff;
+double bin_size = 2*cutoff;
 int row_lda;
 int column_lda;
 double upper_boundary;
@@ -607,10 +607,6 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
     }
 
 
-    for( int j =0; j < column_lda; j++){
-        apply_force_bin_upper_boundary(1, j, 1, j);
-        apply_force_bin_lower_boundary(row_lda-2, j, row_lda-2, j);
-    }
 
     // for (int i = 0; i < num_parts; ++i) {
     //     move(parts[i], size);
