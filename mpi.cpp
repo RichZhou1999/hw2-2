@@ -15,7 +15,7 @@ The idea of this mpi code:
     |________________| <- subregion 2
     |________________| <- subregion 3
     |________________| <- subregion 4
-                                 */
+*/
 
 #include "common.h"
 #include <mpi.h>
@@ -26,8 +26,7 @@ The idea of this mpi code:
 #include <bits/stdc++.h>
 #include <fstream>
 #include <sstream>
-
-                                 std::unordered_map<int, std::unordered_set<particle_t *>> bins;
+std::unordered_map<int, std::unordered_set<particle_t *>> bins;
 std::unordered_map<int, int> particle_to_bin;
 double zone_size;
 double bin_size = cutoff;
@@ -35,8 +34,6 @@ int row_lda;
 int column_lda;
 double upper_boundary;
 double lower_boundary;
-int particle_going_out_num;
-std::vector<particle_t> particle_going_out;
 
 int particle_going_out_upper_num;
 std::vector<particle_t> particle_going_out_upper;
@@ -47,13 +44,21 @@ std::vector<particle_t> particle_going_out_lower;
 int particle_possible_coming_in_upper_num;
 std::vector<particle_t> particle_possible_coming_in_upper;
 int particle_possible_coming_in_lower_num;
+
 std::vector<particle_t> particle_possible_coming_in_lower;
+//ghost particles
 int particle_beyond_upper_boundary_num;
 std::vector<particle_t> particle_beyond_upper_boundary;
+
+//ghost particles
 int particle_beyond_lower_boundary_num;
 std::vector<particle_t> particle_beyond_lower_boundary;
+
+//boundary particles
 int upper_boudary_particle_num;
 std::vector<particle_t> particle_upper_boundary;
+
+//boundary particles
 int lower_boudary_particle_num;
 std::vector<particle_t> particle_lower_boundary;
 
@@ -63,11 +68,12 @@ std::vector<particle_t > particle_send_gathering;
 int number_particles_sending;
 int number_particles_receiving_sum;
 std::vector<particle_t > particle_receive_gathering;
+// the gather need to know where to put the gathered data from each
+// rank, displacement tell the start index for each rank
 std::vector<int > displacement;
 std::vector<int> number_particles_receiving;
 int step = 0;
 
-// std::vector<int > displacement;
 // Put any static global variables here that you will use throughout the simulation.
 
 
@@ -91,24 +97,36 @@ int calculate_bin_number(double x, double y, double size, double bin_size, int r
 }
 
 void update_boundary_particles(){
+    /*
+     particles that are within the distance of "cutoff" from boundary
+    are regard as boundary particles which need to be communicated.
+     Considering that the height of the last layer is usually smaller
+     than "cutoff", so last two layers have to be considered as boundary.
+    */
+
+    // clear all the boundary particles, because they change after one step
     particle_upper_boundary.clear();
     upper_boudary_particle_num = 0;
     particle_lower_boundary.clear();
     lower_boudary_particle_num = 0;
 
     for(int i = 0; i < column_lda; i++){
+        //first layer
         for (auto it = bins[i].begin(); it != bins[i].end(); ++it){
             particle_upper_boundary.push_back(**it);
             upper_boudary_particle_num += 1;
         }
+        //second layer(not necessary)
         for (auto it = bins[i + column_lda].begin(); it != bins[i+ column_lda].end(); ++it){
             particle_upper_boundary.push_back(**it);
             upper_boudary_particle_num += 1;
         }
+        // 2th bottom layer
         for (auto it = bins[i + (row_lda-2)*column_lda].begin(); it != bins[i+ (row_lda-2)*column_lda].end(); ++it){
             particle_lower_boundary.push_back(**it);
             lower_boudary_particle_num += 1;
         }
+        //bottom layer(usually smaller than "cutoff"
         for (auto it = bins[i + (row_lda-1)*column_lda].begin(); it != bins[i+ (row_lda-1)*column_lda].end(); ++it){
             particle_lower_boundary.push_back(**it);
             lower_boudary_particle_num += 1;
@@ -197,22 +215,20 @@ void move(particle_t& p, double size) {
     int new_bin =calculate_bin_number(p.x, p.y, size, bin_size, row_lda, column_lda);
     if(origin_bin == new_bin) return;
 
+    // if new_bin is larger than 0, then this particle doesn't go outside
+    // of the subregion
     if (new_bin >= 0 ){
         // std::cout<< new_bin << "\n";
         bins[origin_bin].erase(&p);
         bins[new_bin].insert(&p);
     }
-    // else{
-    //     bins[origin_bin].erase(&p);
-    //     particle_going_out.push_back(p);
-    //     particle_going_out_num += 1;
-    // }
+    // new_bin == -1, going out from upper boundary
     if (new_bin == -1){
         bins[origin_bin].erase(&p);
         particle_going_out_upper.push_back(p);
         particle_going_out_upper_num += 1;
     }
-
+    // new_bin == -2, going out from lower boundary
     if (new_bin == -2){
         bins[origin_bin].erase(&p);
         particle_going_out_lower.push_back(p);
@@ -248,6 +264,7 @@ void apply_force_bin_self(int row, int column, int row2, int column2){
     }
 }
 
+// calculate the particle force at the boundary with all the ghost particles
 void apply_force_bin_upper_boundary(int row, int column, int row2, int column2){
     // Force every particle in each bin to interact
     if (!check_boundary(row, column) && !check_boundary(row2, column2)){
@@ -274,31 +291,15 @@ void apply_force_bin_lower_boundary(int row, int column, int row2, int column2){
         }
     }
 }
-// void test_send_recv(int rank, int num_procs){
-//     int temp = rank;
-//     int recv_temp;
-//     if (rank != (num_procs -1)){
-//            MPI_Send(
-//             &temp,
-//             1,
-//             MPI_INT,
-//             (rank + 1)%num_procs,
-//             0,
-//             MPI_COMM_WORLD);
-//     }
-//     if (rank !=0 ){
-//         MPI_Recv(&recv_temp,
-//         1,
-//         MPI_INT,
-//         (rank - 1),
-//         0,
-//         MPI_COMM_WORLD,
-//         MPI_STATUS_IGNORE);
-//         std::cout<<"Processor"<< rank << "received" << recv_temp <<"\n";
-//     }
-// }
+
 
 void send_recv_boundary_particles(int rank , int num_procs){
+    /* the process of send and receive is
+       step1: send the number of particles to its corresponding two neighbors
+       step2: receive the number of particles
+       step3: send the particles themselves
+       step4: receive the particles
+    */
     if(rank != (num_procs -1)){
         MPI_Send(&lower_boudary_particle_num,
                  1,
@@ -370,9 +371,8 @@ void send_recv_boundary_particles(int rank , int num_procs){
 
 }
 void init_simulation(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
+    // the height of subregion
     zone_size = size / num_procs;
-
-
     double quotient = zone_size / bin_size;
     row_lda = (int) ceil(quotient);
 
@@ -388,137 +388,27 @@ void init_simulation(particle_t* parts, int num_parts, double size, int rank, in
     for(int i = 0; i< row_lda*column_lda; ++i){
         bins[i].reserve(space);
     }
-    // std::ofstream myfile;
 
-    // std::ostringstream oss;
-    // oss << "example" << rank << ".txt";
-    // std::string name = oss.str();
-
-    // myfile.open (name);
+    //put every particle to the right subregion
     for (int i = 0; i < num_parts; ++i){
         int index;
         index = calculate_bin_number(parts[i].x,parts[i].y, size, bin_size, row_lda, column_lda);
-        // myfile<<" y " << parts[i].y <<  " rank " << rank << " index " << index << "\n";
         if (index >= 0){
             bins[index].insert(&parts[i]);
         }
-        // bins[index].insert(&parts[i]);
-        // particle_to_bin[parts[i].id] = index;
     }
-    // myfile.close();
 
-    number_particles_sending = 0;
-    for( int i =0 ; i < row_lda; i++){
-        for( int j =0; j < column_lda; j++){
-            for (auto it = bins[j+i*column_lda].begin(); it != bins[j+i*column_lda].end(); ++it){
-                number_particles_sending+=1;
-            }
-        }
-    }
-    // std::cout << "rank "<<rank<< "num" << number_particles_sending << "\n";
+//    number_particles_sending = 0;
+//    for( int i =0 ; i < row_lda; i++){
+//        for( int j =0; j < column_lda; j++){
+//            for (auto it = bins[j+i*column_lda].begin(); it != bins[j+i*column_lda].end(); ++it){
+//                number_particles_sending+=1;
+//            }
+//        }
+//    }
 
     update_boundary_particles();
     send_recv_boundary_particles(rank, num_procs);
-    // if(rank != (num_procs -1)){
-    //     MPI_Send(&lower_boudary_particle_num,
-    //             1,
-    //             MPI_INT,
-    //             rank+1,
-    //             0,
-    //             MPI_COMM_WORLD);
-    //     MPI_Send(&particle_lower_boundary[0],
-    //     lower_boudary_particle_num,
-    //     PARTICLE,
-    //     rank+1,
-    //     0,
-    //     MPI_COMM_WORLD);
-    // }
-    // if(rank != 0){
-    //     MPI_Recv(&particle_beyond_upper_boundary_num,
-    //             1,
-    //             MPI_INT,
-    //             rank-1,
-    //             0,
-    //             MPI_COMM_WORLD,
-    //             MPI_STATUS_IGNORE);
-    //     std::cout<<"zone: "<< rank << "received upper" << particle_beyond_upper_boundary_num<< " paticles" <<"\n";
-    //     particle_beyond_upper_boundary.resize(particle_beyond_upper_boundary_num);
-    //     MPI_Recv(&particle_beyond_upper_boundary[0],
-    //             particle_beyond_upper_boundary_num,
-    //             PARTICLE,
-    //             rank-1,
-    //             0,
-    //             MPI_COMM_WORLD,
-    //             MPI_STATUS_IGNORE);
-
-    // }
-
-    // if(rank != 0){
-    //     MPI_Send(&upper_boudary_particle_num,
-    //             1,
-    //             MPI_INT,
-    //             rank-1,
-    //             0,
-    //             MPI_COMM_WORLD);
-    //     MPI_Send(&particle_upper_boundary[0],
-    //     upper_boudary_particle_num,
-    //     PARTICLE,
-    //     rank-1,
-    //     0,
-    //     MPI_COMM_WORLD);
-    // }
-
-
-    // if(rank != (num_procs -1)){
-    //     MPI_Recv(&particle_beyond_lower_boundary_num,
-    //             1,
-    //             MPI_INT,
-    //             rank+1,
-    //             0,
-    //             MPI_COMM_WORLD,
-    //             MPI_STATUS_IGNORE);
-    //     std::cout<<"zone: "<< rank << "received lower" << particle_beyond_lower_boundary_num<< " paticles" <<"\n";
-    //     particle_beyond_lower_boundary.resize(particle_beyond_lower_boundary_num);
-    //     MPI_Recv(&particle_beyond_lower_boundary[0],
-    //             particle_beyond_lower_boundary_num,
-    //             PARTICLE,
-    //             rank+1,
-    //             0,
-    //             MPI_COMM_WORLD,
-    //             MPI_STATUS_IGNORE);
-    // }
-
-
-    // if(rank != (num_procs -1)){
-    //     MPI_Send(&particle_lower_boundary[0],
-    //     lower_boudary_particle_num,
-    //     PARTICLE,
-    //     rank+1,
-    //     0,
-    //     MPI_COMM_WORLD);
-    // }
-    // if(rank != 0){
-    //     particle_beyond_upper_boundary.resize(particle_beyond_upper_boundary_num);
-    //     MPI_Recv(&particle_beyond_upper_boundary[0],
-    //             particle_beyond_upper_boundary_num,
-    //             PARTICLE,
-    //             rank-1,
-    //             0,
-    //             MPI_COMM_WORLD,
-    //             MPI_STATUS_IGNORE);
-    // }
-    // for(int i=0; i < particle_beyond_upper_boundary.size(); i++){
-    //     std::cout <<particle_beyond_upper_boundary[i].id <<"\n";
-    // }
-
-    // if(rank != (num_procs -1)){
-    //     MPI_Send(&particle_lower_boundary,
-    //             lower_boudary_particle_num,
-    //             PARTICLE,
-    //             rank+1,
-    //             0,
-    //             MPI_COMM_WORLD);
-    // }
 
 
 
@@ -602,27 +492,25 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
             }
         }
     }
-
+    // regular force apply to the particles not on the boundary
     for( int i =1 ; i < row_lda - 1; i++){
         for( int j =0; j < column_lda; j++){
             apply_force_bins(i, j);
         }
     }
 
+    // particles within the region of "one cutoff"
     for( int j =0; j < column_lda; j++){
         apply_force_bins_upper_boundary(0,j);
         apply_force_bins_lower_boundary(row_lda-1,j);
     }
 
-
+    // particles within the region of "one cutoff"
     for( int j =0; j < column_lda; j++){
         apply_force_bin_upper_boundary(1, j, 1, j);
         apply_force_bin_lower_boundary(row_lda-2, j, row_lda-2, j);
     }
 
-    // for (int i = 0; i < num_parts; ++i) {
-    //     move(parts[i], size);
-    // }
 
     int going_out_space = ceil(1.5 * bin_size * zone_size * 1. / density);
     particle_going_out.reserve(going_out_space);
@@ -630,20 +518,11 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
     for (auto it = flatten_particles.begin(); it != flatten_particles.end(); ++it) {
         move(**it, size);
     }
-    // int going_out_space = ceil(1.5 * bin_size * zone_size * 1. / density);
-    // particle_going_out.reserve(going_out_space);
-
-    // for (auto it = flatten_particles.begin(); it != flatten_particles.end(); ++it) {
-    //     int index;
-    //     index = calculate_bin_number((*it)->x,(*it)->y,size,bin_size,row_lda,column_lda);
-    //     if (index == -1){
-    //         particle_going_out.push_back(**it);
-    //         particle_going_out_num += 1;
-    //     }
-    // }
 
     flatten_particles.clear();
 
+    // following lines send particles that go out to the neighbor subregions
+    // send number of particles first and then send the particles object vector
     if(rank != (num_procs -1)){
         MPI_Send(&particle_going_out_lower_num,
                  1,
@@ -760,7 +639,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
     //     }
     // }
 
-
+    // accept the newly incoming particles from upper direction and assign bins
     for (auto it = particle_possible_coming_in_upper.begin(); it != particle_possible_coming_in_upper.end(); ++it) {
         particle_t* temp = new particle_t;
         temp -> id = (*it).id;
@@ -778,6 +657,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
         }
     }
 
+    // accept the newly incoming particles from lower direction and assign bins
     for (auto it = particle_possible_coming_in_lower.begin(); it != particle_possible_coming_in_lower.end(); ++it) {
         particle_t* temp = new particle_t;
         temp -> id = (*it).id;
@@ -794,13 +674,6 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
             bins[index].insert(temp);
         }
     }
-    // int temp_sum = 0;
-    // for( int i =0 ; i < row_lda; i++){
-    //     for( int j =0; j < column_lda; j++){
-    //         temp_sum += bins[j+i*column_lda].size();
-    //     }
-    // }
-    // std::cout <<  "rank" <<rank <<"tempsum "<< temp_sum << " step " << step << "\n";
 
 
 
@@ -808,14 +681,10 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
     particle_possible_coming_in_lower_num = 0;
     particle_possible_coming_in_upper.clear();
     particle_possible_coming_in_upper_num = 0;
+
+    //update the boundary particles and send to neighbors as ghost particles
     update_boundary_particles();
     send_recv_boundary_particles(rank, num_procs);
-    // int sum = 0;
-    // for( int i =0 ; i < row_lda; i++){
-    //     for( int j =0; j < column_lda; j++){
-    //         sum += bins[j+i*column_lda].size();
-    //     }
-    // }
 
 }
 
@@ -824,7 +693,7 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
     // processor has an in-order view of all particles. That is, the array
     // parts is complete and sorted by particle id.
 
-    // std::cout << "123" << "\n";
+
     number_particles_sending = 0;
     particle_send_gathering.clear();
     for( int i =0 ; i < row_lda; i++){
@@ -861,16 +730,6 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
                    MPI_COMM_WORLD);
         // std::cout << number_particles_sending << "\n";
     }
-
-    // if(rank == 0){
-    //     number_particles_receiving_sum = 0;
-    //     int displacement[num_procs];
-    //     for(int i = 0; i < num_procs; i++){
-    //         displacement[i] = number_particles_receiving_sum;
-    //         number_particles_receiving_sum = number_particles_receiving_sum + number_particles_receiving[i];
-    //     }
-    //     std::cout << number_particles_receiving_sum << "\n";
-    // }
 
     if (rank == 0){
         particle_receive_gathering.clear();
