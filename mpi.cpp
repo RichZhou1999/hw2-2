@@ -28,7 +28,7 @@ The idea of this mpi code:
 std::unordered_map<int, std::unordered_set<particle_t *>> bins;
 std::unordered_map<int, int> particle_to_bin;
 double zone_size;
-double bin_size = cutoff;
+double bin_size = 2*cutoff;
 int row_lda;
 int column_lda;
 double upper_boundary;
@@ -434,6 +434,9 @@ void send_recv_boundary_particles(int rank , int num_procs){
 
 }
 void init_simulation(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
+    if ((size / num_procs/bin_size) < 1){
+        bin_size = cutoff;
+    }
     zone_size = size / num_procs;
 
 
