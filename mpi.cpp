@@ -30,7 +30,7 @@ The idea of this mpi code:
                                  std::unordered_map<int, std::unordered_set<particle_t *>> bins;
 std::unordered_map<int, int> particle_to_bin;
 double zone_size;
-double bin_size = 3*cutoff;
+double bin_size = cutoff;
 int row_lda;
 int column_lda;
 double upper_boundary;
@@ -100,6 +100,14 @@ void update_boundary_particles(){
         for (auto it = bins[i].begin(); it != bins[i].end(); ++it){
             particle_upper_boundary.push_back(**it);
             upper_boudary_particle_num += 1;
+        }
+        for (auto it = bins[i + column_lda].begin(); it != bins[i+ column_lda].end(); ++it){
+            particle_upper_boundary.push_back(**it);
+            upper_boudary_particle_num += 1;
+        }
+        for (auto it = bins[i + (row_lda-2)*column_lda].begin(); it != bins[i+ (row_lda-2)*column_lda].end(); ++it){
+            particle_lower_boundary.push_back(**it);
+            lower_boudary_particle_num += 1;
         }
         for (auto it = bins[i + (row_lda-1)*column_lda].begin(); it != bins[i+ (row_lda-1)*column_lda].end(); ++it){
             particle_lower_boundary.push_back(**it);
@@ -786,12 +794,12 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
             bins[index].insert(temp);
         }
     }
-    int temp_sum = 0;
-    for( int i =0 ; i < row_lda; i++){
-        for( int j =0; j < column_lda; j++){
-            temp_sum += bins[j+i*column_lda].size();
-        }
-    }
+    // int temp_sum = 0;
+    // for( int i =0 ; i < row_lda; i++){
+    //     for( int j =0; j < column_lda; j++){
+    //         temp_sum += bins[j+i*column_lda].size();
+    //     }
+    // }
     // std::cout <<  "rank" <<rank <<"tempsum "<< temp_sum << " step " << step << "\n";
 
 
