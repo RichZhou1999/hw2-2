@@ -24,8 +24,8 @@ The idea of this mpi code:
 #include <unordered_map>
 #include <iostream>
 #include <bits/stdc++.h>
-#include <fstream>
-#include <sstream>
+#include <chrono>
+
 std::unordered_map<int, std::unordered_set<particle_t *>> bins;
 std::unordered_map<int, int> particle_to_bin;
 double zone_size;
@@ -73,7 +73,8 @@ std::vector<particle_t > particle_receive_gathering;
 std::vector<int > displacement;
 std::vector<int> number_particles_receiving;
 int step = 0;
-
+std::chrono::steady_clock::time_point begin;
+std::chrono::steady_clock::time_point end;
 // Put any static global variables here that you will use throughout the simulation.
 
 
@@ -492,12 +493,16 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
             }
         }
     }
+    if( (step == 10) and (rank == 1) ){
+        begin = std::chrono::steady_clock::now();
+    }
     // regular force apply to the particles not on the boundary
     for( int i =1 ; i < row_lda - 1; i++){
         for( int j =0; j < column_lda; j++){
             apply_force_bins(i, j);
         }
     }
+
 
     // particles within the region of "one cutoff"
     for( int j =0; j < column_lda; j++){
@@ -511,9 +516,13 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
         apply_force_bin_lower_boundary(row_lda-2, j, row_lda-2, j);
     }
 
+    if( (step == 10) and (rank == 1) ){
+        end = std::chrono::steady_clock::now();
+        std::cout << "Time difference in apply force= " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+    }
 
-    int going_out_space = ceil(1.5 * bin_size * zone_size * 1. / density);
-    particle_going_out.reserve(going_out_space);
+//    int going_out_space = ceil(1.5 * bin_size * zone_size * 1. / density);
+//    particle_going_out.reserve(going_out_space);
     update_flatten_particles();
     for (auto it = flatten_particles.begin(); it != flatten_particles.end(); ++it) {
         move(**it, size);
@@ -521,6 +530,10 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
 
     flatten_particles.clear();
 
+
+    if( (step == 10) and (rank == 1) ){
+        begin = std::chrono::steady_clock::now();
+    }
     // following lines send particles that go out to the neighbor subregions
     // send number of particles first and then send the particles object vector
     if(rank != (num_procs -1)){
@@ -624,7 +637,10 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
         // std::cout << "p"<<rank<<" recv " << particle_possible_coming_in_upper.size() << "from" << rank-1 << "\n";
         // std::cout << " --------------------------------------" << "\n";
     }
-
+    if( (step == 10) and (rank == 1) ){
+        end = std::chrono::steady_clock::now();
+        std::cout << "Time difference in send_recv= " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+    }
     // bins.clear();
 
     // for( int i =0 ; i < row_lda; i++){
@@ -638,7 +654,9 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
     //         }
     //     }
     // }
-
+    if( (step == 10) and (rank == 1) ){
+        begin = std::chrono::steady_clock::now();
+    }
     // accept the newly incoming particles from upper direction and assign bins
     for (auto it = particle_possible_coming_in_upper.begin(); it != particle_possible_coming_in_upper.end(); ++it) {
         particle_t* temp = new particle_t;
@@ -685,7 +703,10 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
     //update the boundary particles and send to neighbors as ghost particles
     update_boundary_particles();
     send_recv_boundary_particles(rank, num_procs);
-
+    if( (step == 10) and (rank == 1) ){
+        end = std::chrono::steady_clock::now();
+        std::cout << "Time difference in update ghost= " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+    }
 }
 
 void gather_for_save(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
