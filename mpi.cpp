@@ -218,7 +218,9 @@ void move(particle_t& p, double size) {
         // std::cout<< new_bin << "\n";
         bins[origin_bin].erase(&p);
         bins[new_bin].insert(&p);
+        return;
     }
+    
     bins[origin_bin].erase(&p);
     // Convert bin # (which neighbor) to index
     auto container = message_containers.at(new_bin + 2);
@@ -314,7 +316,7 @@ void apply_force_bin_lower_boundary(int row, int column, int row2, int column2){
 }
 
 bool check_if_ranks_fit(int rank, int num_procs) {
-    return rank >= 0 && rank <= num_procs;
+    return rank >= 0 && rank < num_procs;
 }
 
 void recv_ghost_particles(int rank, int num_procs, int container_ind, int rank_diff) {
@@ -419,41 +421,6 @@ void send_recv_particles(int rank, int num_procs) {
     // Receive upper info from upper neighbor
     recv_particles(rank, num_procs, 0, -1);
 }
-
-// void send_recv_lower_particles(int rank, int num_procs) {
-//     if(rank != (num_procs -1)){
-//         MPI_Send(&particle_going_out_lower_num,
-//                  1,
-//                  MPI_INT,
-//                  rank+1,
-//                  0,
-//                  MPI_COMM_WORLD);
-//         MPI_Send(&particle_going_out_lower[0],
-//                  particle_going_out_lower_num,
-//                  PARTICLE,
-//                  rank+1,
-//                  1,
-//                  MPI_COMM_WORLD);
-//     }
-//     if(rank != 0){
-//         MPI_Recv(&particle_possible_coming_in_upper_num,
-//                  1,
-//                  MPI_INT,
-//                  rank-1,
-//                  0,
-//                  MPI_COMM_WORLD,
-//                  MPI_STATUS_IGNORE);
-//         particle_possible_coming_in_upper.resize(particle_possible_coming_in_upper_num);
-//         MPI_Recv(&particle_possible_coming_in_upper[0],
-//                  particle_possible_coming_in_upper_num,
-//                  PARTICLE,
-//                  rank-1,
-//                  1,
-//                  MPI_COMM_WORLD,
-//                  MPI_STATUS_IGNORE);
-//     }   
-// }
-
 
 void init_simulation(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
     if ((size / num_procs/bin_size) < 1){
