@@ -333,28 +333,34 @@ void send_recv_boundary_particles(int rank , int num_procs){
 	OUT status status object (status)
 	*/
 	// if rank not at upper domain boundary
-    if(rank != 0)
+    if(rank != (num_procs -1))
+	{
+		// send particle number
+        MPI_Send(&lower_boundary_particle_num,        1, MPI_INT, rank+1, 0, MPI_COMM_WORLD);
+        // send particle from lower boundary
+        MPI_Send(&particle_lower_boundary[0],        lower_boundary_particle_num, PARTICLE,
+                 rank+1, 0, MPI_COMM_WORLD);
+	}
+	if(rank != 0)
+	{
+		// recv particle number crossing upper bound
+        MPI_Recv(&particle_beyond_upper_boundary_num, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        particle_beyond_upper_boundary.resize(particle_beyond_upper_boundary_num);
+        // recv particle crossing upper bound
+        MPI_Recv(&particle_beyond_upper_boundary[0],  particle_beyond_upper_boundary_num, PARTICLE,
+                 rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	}
+	if(rank != 0)
 	{
        // send particle number upper boundary
         MPI_Send(&upper_boundary_particle_num,        1, MPI_INT, rank-1, 0, MPI_COMM_WORLD);
         // send particles upper boundary
 		MPI_Send(&particle_upper_boundary[0], upper_boundary_particle_num, PARTICLE, 
 		         rank-1, 0, MPI_COMM_WORLD);
-	    // recv particle number crossing upper bound 
-		MPI_Recv(&particle_beyond_upper_boundary_num, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        particle_beyond_upper_boundary.resize(particle_beyond_upper_boundary_num);
-        // recv particle crossing upper bound
-		MPI_Recv(&particle_beyond_upper_boundary[0],  particle_beyond_upper_boundary_num, PARTICLE, 
-		         rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	}
 	// if rank not at lower domain boundary
 	if(rank != (num_procs -1))
 	{
-		// send particle number
-        MPI_Send(&lower_boundary_particle_num,        1, MPI_INT, rank+1, 0, MPI_COMM_WORLD);
-		// send particle from lower boundary
-        MPI_Send(&particle_lower_boundary[0],        lower_boundary_particle_num, PARTICLE, 
-		         rank+1, 0, MPI_COMM_WORLD);
 		// recv particle number lower boundary
         MPI_Recv(&particle_beyond_lower_boundary_num, 1, MPI_INT, rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         particle_beyond_lower_boundary.resize(particle_beyond_lower_boundary_num);
@@ -540,30 +546,53 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
         move(**it, size);
     }
     flatten_particles.clear();
+    if(rank != (num_procs -1))
+    {
+		// Send parts nr outgoing from lower GZ
+        MPI_Send(&particle_going_out_lower_num, 1, MPI_INT, rank+1, 0, MPI_COMM_WORLD);
+	}
     if (rank != 0)
-	{
-        // Send parts nr and parts outgoing form upper GZ
-		MPI_Send(&particle_going_out_upper_num, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD);
-		MPI_Send(&particle_going_out_upper[0], particle_going_out_upper_num, PARTICLE, rank-1, 1, MPI_COMM_WORLD);
-		// update size of container for particles incoming upper GZ
-		particle_possible_coming_in_upper.resize(particle_possible_coming_in_upper_num);
-		// Recv parts nr and parts incoming from upper GZ
-        MPI_Recv(&particle_possible_coming_in_upper_num, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		MPI_Recv(&particle_possible_coming_in_upper[0], particle_possible_coming_in_upper_num, PARTICLE, rank-1, 1,
-                 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    {
+        // Send parts nr outgoing form upper GZ
+        MPI_Send(&particle_going_out_upper_num, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD);
     }
 	if(rank != (num_procs -1))
+    {
+		// Recv parts nr and parts incoming from lower GZ
+		MPI_Recv(&particle_possible_coming_in_lower_num, 1, MPI_INT, rank +1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	}
+	if (rank != 0)
+    {
+		// Recv parts nr and parts incoming from upper GZ
+        MPI_Recv(&particle_possible_coming_in_upper_num, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	}
+    if(rank != (num_procs -1))
+    {
+        // Send parts outgoing form lower GZ
+		MPI_Send(&particle_going_out_lower[0], particle_going_out_lower_num, PARTICLE, rank+1, 1, MPI_COMM_WORLD);
+	}
+	if (rank != 0)
+    {
+		// send parts outgoing from upper GZ
+		MPI_Send(&particle_going_out_upper[0], particle_going_out_upper_num, PARTICLE, rank-1, 1, MPI_COMM_WORLD);
+	}
+	if(rank != (num_procs -1))
 	{
-		// Send parts nr and parts outgoing from lower GZ
-		MPI_Send(&particle_going_out_lower_num, 1, MPI_INT, rank+1, 0, MPI_COMM_WORLD);
-        MPI_Send(&particle_going_out_lower[0], particle_going_out_lower_num, PARTICLE, rank+1, 1, MPI_COMM_WORLD);
 		// update size of container for particles incoming lower GZ
 		particle_possible_coming_in_lower.resize(particle_possible_coming_in_lower_num);
-        // Recv parts nr and parts incoming from lower GZ
-		MPI_Recv(&particle_possible_coming_in_lower_num, 1, MPI_INT, rank +1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        
 		MPI_Recv(&particle_possible_coming_in_lower[0], particle_possible_coming_in_lower_num, PARTICLE, rank+1, 1,
                  MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	}
+	if (rank != 0)
+	{
+		// update size of container for particles incoming upper GZ
+		particle_possible_coming_in_upper.resize(particle_possible_coming_in_upper_num);
+		MPI_Recv(&particle_possible_coming_in_upper[0], particle_possible_coming_in_upper_num, PARTICLE, rank-1, 1,
+                 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    }
+
+	
 
 	for (auto it = particle_possible_coming_in_upper.begin(); it != particle_possible_coming_in_upper.end(); ++it) {
         particle_t temp = *it;
