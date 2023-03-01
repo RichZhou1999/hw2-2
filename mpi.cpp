@@ -31,9 +31,9 @@ std::unordered_map<int, std::unordered_set<particle_t *>> bins;
 std::unordered_map<int, int> particle_to_bin;
 // Program constants
 double zone_size;
-double bin_size = cutoff;
+double bin_size = 2*cutoff;
 // nr of rows in domain
-int    irow_lda;
+int    row_lda;
 // nr of cols in domain
 int    column_lda;
 // y-value of upper and lower boundary
@@ -59,9 +59,12 @@ std::vector<particle_t> particle_possible_coming_in_lower;
 // particles gone beyond upper boundary - Upper Ghost Zone (GZ) particles
 int particle_beyond_upper_boundary_num;
 std::vector<particle_t> particle_beyond_upper_boundary;
+std::unordered_map<int, std::unordered_set<particle_t *>> particle_beyond_upper_bound
 // particles gone beyond lower boundary - Lower GZ particles
 int particle_beyond_lower_boundary_num;
 std::vector<particle_t> particle_beyond_lower_boundary;
+std::unordered_map<int, std::unordered_set<particle_t *>> particle_beyond_lower_bound
+int upper_boudary_particle_num
 // Upper GZ particles
 int upper_boundary_particle_num;
 std::vector<particle_t> particle_upper_boundary;
@@ -93,7 +96,8 @@ int calculate_bin_number(double x, double y, double size, double bin_size, int r
     if (( y >= lower_boundary)){
         return -2;
     }
-    // ?
+    // generalize the y coord to be from the upper boundary
+	// every processor has equivalent set of coordinates
 	y = y - upper_boundary;
     // row index
 	int row = int( y / bin_size );
@@ -123,14 +127,14 @@ void update_boundary_particles(){
             upper_boundary_particle_num += 1;
         }
 		// add particles to Lower GZ from current bin
-		// layer in current bin included in GZ of neigh is at i + (irow_lda-2)
-        for (auto it = bins[i + (irow_lda-2)*column_lda].begin(); it != bins[i+ (irow_lda-2)*column_lda].end(); ++it){
+		// layer in current bin included in GZ of neigh is at i + (row_lda-2)
+        for (auto it = bins[i + (row_lda-2)*column_lda].begin(); it != bins[i+ (row_lda-2)*column_lda].end(); ++it){
             particle_lower_boundary.push_back(**it);
             lower_boudary_particle_num += 1;
         }
 		// add particles to Lower GZ from below bingc
 		// layer in current bin included in GZ of current
-        for (auto it = bins[i + (irow_lda-1)*column_lda].begin(); it != bins[i+ (irow_lda-1)*column_lda].end(); ++it){
+        for (auto it = bins[i + (row_lda-1)*column_lda].begin(); it != bins[i+ (row_lda-1)*column_lda].end(); ++it){
             particle_lower_boundary.push_back(**it);
             lower_boudary_particle_num += 1;
         }
@@ -183,7 +187,7 @@ void apply_force_bi_direction(particle_t& particle, particle_t& neighbor) {
 // given row and col indices
 // check if at boundary
 bool check_boundary(int row , int column){
-    if ((row < 0) or (row>=irow_lda)){
+    if ((row < 0) or (row>=row_lda)){
         return false;
     }
     if ((column < 0) or (column >=column_lda)){
@@ -198,7 +202,7 @@ void move(particle_t& p, double size) {
     // Conserves energy better than explicit Euler method
 
     // origin of the current bin (same as bin number)
-	int origin_bin = calculate_bin_number(p.x,p.y, size,bin_size,irow_lda, column_lda);
+	int origin_bin = calculate_bin_number(p.x,p.y, size,bin_size,row_lda, column_lda);
     // update velocities
 	p.vx += p.ax * dt;
     p.vy += p.ay * dt;
@@ -216,7 +220,7 @@ void move(particle_t& p, double size) {
         p.vy = -p.vy;
     }
     // compute new bin indices from new particle position
-    int new_bin = calculate_bin_number(p.x, p.y, size, bin_size, irow_lda, column_lda);
+    int new_bin = calculate_bin_number(p.x, p.y, size, bin_size, row_lda, column_lda);
     if(origin_bin == new_bin) return;
 
     // move particle within processor or bin?
@@ -316,24 +320,28 @@ void send_recv_boundary_particles(int rank , int num_procs){
     }
     if(rank != 0)
 	{
-        // recv particle number 
+        // recv particle number crossing upper bound 
 		MPI_Recv(&particle_beyond_upper_boundary_num, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         particle_beyond_upper_boundary.resize(particle_beyond_upper_boundary_num);
-        
+        // recv particle crossing upper bound
 		MPI_Recv(&particle_beyond_upper_boundary[0],  particle_beyond_upper_boundary_num, 
 		         PARTICLE, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
     }
     if(rank != 0)
 	{
+		// send particle number upper boundary
         MPI_Send(&upper_boundary_particle_num, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD);
-        MPI_Send(&particle_upper_boundary[0], upper_boundary_particle_num, PARTICLE, rank-1, 0, MPI_COMM_WORLD);
+        // send particles upper boundary
+		MPI_Send(&particle_upper_boundary[0], upper_boundary_particle_num, PARTICLE, rank-1, 0, MPI_COMM_WORLD);
     }
     if(rank != (num_procs -1))
 	{
+		// recv particle number lower boundary
         MPI_Recv(&particle_beyond_lower_boundary_num, 1, MPI_INT, rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         particle_beyond_lower_boundary.resize(particle_beyond_lower_boundary_num);
-        MPI_Recv(&particle_beyond_lower_boundary[0], particle_beyond_lower_boundary_num, PARTICLE, 
+        // recv particles crossing lower boundary
+		MPI_Recv(&particle_beyond_lower_boundary[0], particle_beyond_lower_boundary_num, PARTICLE, 
 		         rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
 
@@ -343,7 +351,7 @@ void init_simulation(particle_t* parts, int num_parts, double size, int rank, in
     // nr of bins in the GZ
     double quotient = zone_size / bin_size;
     // row index of the GZ
-	irow_lda = (int) ceil(quotient);
+	row_lda = (int) ceil(quotient);
     // number of bins in the domain
     quotient = size / bin_size;
 	// nr col in domain
@@ -356,20 +364,20 @@ void init_simulation(particle_t* parts, int num_parts, double size, int rank, in
     // std::cout<<"lower_boundary" <<lower_boundary << "rank" << rank << "\n";
     // whats this? allocate space elements in bin
 	const int space = ceil(1.5 * bin_size * bin_size * 1. / density);
-    for(int i = 0; i< irow_lda*column_lda; ++i){
+    for(int i = 0; i< row_lda*column_lda; ++i){
         bins[i].reserve(space);
     }
     // compute index
     for (int i = 0; i < num_parts; ++i){
         int index;
-        index = calculate_bin_number(parts[i].x,parts[i].y, size, bin_size, irow_lda, column_lda);
+        index = calculate_bin_number(parts[i].x,parts[i].y, size, bin_size, row_lda, column_lda);
         if (index >= 0){
             bins[index].insert(&parts[i]);
         }
     }
 
     number_particles_sending = 0;
-    for( int i =0 ; i < irow_lda; i++){
+    for( int i =0 ; i < row_lda; i++){
         for( int j =0; j < column_lda; j++){
             for (auto it = bins[j+i*column_lda].begin(); it != bins[j+i*column_lda].end(); ++it){
                 number_particles_sending+=1;
@@ -423,7 +431,7 @@ void apply_force_bins_lower_boundary(int row, int column){
 void update_flatten_particles(){
     flatten_particles.clear();
     flatten_particles.reserve(ceil(1.5 * zone_size * bin_size*column_lda * 1. / density));
-    for( int i =0 ; i < irow_lda; i++){
+    for( int i =0 ; i < row_lda; i++){
         for( int j =0; j < column_lda; j++){
             for (auto it = bins[j+i*column_lda].begin(); it != bins[j+i*column_lda].end(); ++it){
                 // particle_t* ptr = *it;
@@ -433,17 +441,45 @@ void update_flatten_particles(){
     }
 }
 
+void generate_particle_beyond_boundary_bins(){
+	const int space = ceil(1.5 * bin_size * bin_size * 1. / density);
+	for(int i = 0; i<column_lda; ++i){
+		particle_beyond_upper_boundary_bins[i].clear();
+		particle_beyond_upper_boundary_bins[i].reserve(space);
+		particle_beyond_lower_boundary_bins[i].clear();
+		particle_beyond_lower_boundary_bins[i].reserve(space);
+	}
+	for (auto it = particle_beyond_upper_boundary.begin(); it != particle_beyond_upper_boundary.end(); ++it){
+		int index;
+		double quotient = ((*it).x)/bin_size;
+		index = int(quotient);
+		particle_beyond_upper_boundary_bins[index].insert(&(*it));
+	}
+	for (auto it = particle_beyond_lower_boundary.begin(); it != particle_beyond_lower_boundary.end(); ++it){
+		int index;
+		double quotient = ((*it).x)/bin_size;
+		index = int(quotient);
+		particle_beyond_lower_boundary_bins[index].insert(&(*it));
+	}
+}
+
 
 void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
     step += 1;
-    particle_possible_coming_in_lower.clear();
+    // prepare container for particles that
+	// will cross upper and lower boundary
+    generate_particle_beyond_boundary_bins();
+	// incoming lower and upper GZ reset
+	particle_possible_coming_in_lower.clear();
     particle_possible_coming_in_upper.clear();
-    particle_going_out_lower.clear();
+    // outgoing Lower GZ reset
+	particle_going_out_lower.clear();
     particle_going_out_lower_num = 0;
-    particle_going_out_upper.clear();
+    // outgoing Upper GZ reset
+	particle_going_out_upper.clear();
     particle_going_out_upper_num = 0;
     // reset particles acceleration
-    for( int i =0 ; i < irow_lda; i++)
+    for( int i =0 ; i < row_lda; i++)
 	{
         for( int j =0; j < column_lda; j++)
 		{
@@ -454,26 +490,26 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
             }
         }
     }
-
-    for( int i =1 ; i < irow_lda - 1; i++)
+    // apply force within current bin
+    for( int i =1 ; i < row_lda - 1; i++)
 	{
         for( int j =0; j < column_lda; j++)
 		{
             apply_force_bins(i, j);
         }
     }
-
+    // apply forces in upper and lower GZ
     for( int j =0; j < column_lda; j++)
 	{
         apply_force_bins_upper_boundary(0,j);
-        apply_force_bins_lower_boundary(irow_lda-1,j);
+        apply_force_bins_lower_boundary(row_lda-1,j);
     }
 
 
     for( int j =0; j < column_lda; j++)
 	{
         apply_force_bin_upper_boundary(1, j, 1, j);
-        apply_force_bin_lower_boundary(irow_lda-2, j, irow_lda-2, j);
+        apply_force_bin_lower_boundary(row_lda-2, j, row_lda-2, j);
     }
     // nr outgoing particles
     int going_out_space = ceil(1.5 * bin_size * zone_size * 1. / density);
@@ -486,26 +522,33 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
     flatten_particles.clear();
     if (rank != 0)
 	{
-        MPI_Send(&particle_going_out_upper_num, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD);
-		MPI_Recv(&particle_possible_coming_in_upper_num, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        // Send parts nr and parts outgoing form upper GZ
+		MPI_Send(&particle_going_out_upper_num, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD);
 		MPI_Send(&particle_going_out_upper[0], particle_going_out_upper_num, PARTICLE, rank-1, 1, MPI_COMM_WORLD);
+		// update size of container for particles incoming upper GZ
 		particle_possible_coming_in_upper.resize(particle_possible_coming_in_upper_num);
-        MPI_Recv(&particle_possible_coming_in_upper[0], particle_possible_coming_in_upper_num, PARTICLE, rank-1, 1,
+		// Recv parts nr and parts incoming from upper GZ
+        MPI_Recv(&particle_possible_coming_in_upper_num, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		MPI_Recv(&particle_possible_coming_in_upper[0], particle_possible_coming_in_upper_num, PARTICLE, rank-1, 1,
                  MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
 	if(rank != (num_procs -1))
 	{
+		// Send parts nr and parts outgoing from lower GZ
 		MPI_Send(&particle_going_out_lower_num, 1, MPI_INT, rank+1, 0, MPI_COMM_WORLD);
         MPI_Send(&particle_going_out_lower[0], particle_going_out_lower_num, PARTICLE, rank+1, 1, MPI_COMM_WORLD);
+		// update size of container for particles incoming lower GZ
 		particle_possible_coming_in_lower.resize(particle_possible_coming_in_lower_num);
-        MPI_Recv(&particle_possible_coming_in_lower[0], particle_possible_coming_in_lower_num, PARTICLE, rank+1, 1,
+        // Recv parts nr and parts incoming from lower GZ
+		MPI_Recv(&particle_possible_coming_in_lower_num, 1, MPI_INT, rank +1, 0, MPI_COMM_WORLD; MPI_STATUS_IGNORE);
+		MPI_Recv(&particle_possible_coming_in_lower[0], particle_possible_coming_in_lower_num, PARTICLE, rank+1, 1,
                  MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	}
 
 	for (auto it = particle_possible_coming_in_upper.begin(); it != particle_possible_coming_in_upper.end(); ++it) {
         particle_t temp = *it;
         int index;
-        index = calculate_bin_number(temp.x,temp.y, size, bin_size, irow_lda, column_lda);
+        index = calculate_bin_number(temp.x,temp.y, size, bin_size, row_lda, column_lda);
         if (index >= 0){
             bins[index].insert( &(*it) );
         }
@@ -514,7 +557,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
     for (auto it = particle_possible_coming_in_lower.begin(); it != particle_possible_coming_in_lower.end(); ++it) {
         particle_t temp = *it;        
 		int index;
-        index = calculate_bin_number(temp.x,temp.y, size, bin_size, irow_lda, column_lda);
+        index = calculate_bin_number(temp.x,temp.y, size, bin_size, row_lda, column_lda);
         if (index >= 0){
             bins[index].insert( &(*it) );
         }
@@ -540,7 +583,7 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
 {
     number_particles_sending = 0;
     particle_send_gathering.clear();
-    for( int i =0 ; i < irow_lda; i++){
+    for( int i =0 ; i < row_lda; i++){
         for( int j =0; j < column_lda; j++){
             for (auto it = bins[j+i*column_lda].begin(); it != bins[j+i*column_lda].end(); ++it){
                 particle_send_gathering.push_back(**it);
