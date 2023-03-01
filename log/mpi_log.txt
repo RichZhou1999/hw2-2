@@ -1,0 +1,64 @@
+# test
+Simulation Time = 0.0588849 seconds for 1000 particles.
+ # parts 1000 # nodes 1 # threads 64
+Simulation Time = 0.0549501 seconds for 1000 particles.
+ # parts 1000 # nodes 2 # threads 64
+Simulation Time = 0.0579222 seconds for 1000 particles.
+
+# strong scaling
+# N = 1
+ # parts 6000001 # nodes 1 # threads 8
+Simulation Time = 581.309 seconds for 6000001 particles.
+ # parts 6000002 # nodes 1 # threads 16
+Simulation Time = 294.88 seconds for 6000002 particles.
+ # parts 6000003 # nodes 1 # threads 32
+Simulation Time = 139.7 seconds for 6000003 particles.
+ # parts 6000004 # nodes 1 # threads 64
+Simulation Time = 83.8643 seconds for 6000004 particles.
+# parts 6000000 # nodes 1 # threads 128
+Simulation Time = 53.1865 seconds for 6000000 particles.
+
+# N = 2
+ # parts 6000000 # nodes 2 # threads 128
+Simulation Time = 49.2327 seconds for 6000000 particles.
+# parts 6000000 # nodes 2 # threads 128
+Simulation Time = 49.7574 seconds for 6000000 particles.
+ # parts 6000001 # nodes 2 # threads 64
+Simulation Time = 47.3649 seconds for 6000001 particles.
+ # parts 6000002 # nodes 2 # threads 32
+Simulation Time = 69.9931 seconds for 6000002 particles.
+ # parts 6000003 # nodes 2 # threads 16
+Simulation Time = 145.245 seconds for 6000003 particles.
+ # parts 6000004 # nodes 2 # threads 8
+Simulation Time = 262.817 seconds for 6000004 particles.
+ # parts 6000004 # nodes 2 # threads 1
+Simulation Time = 1475.17 seconds for 6000004 particles.
+
+# weak scaling
+
+ # parts 10000 # nodes 1 # threads 1
+Simulation Time = 1.98045 seconds for 10000 particles.
+ # parts 20000 # nodes 2 # threads 1
+Simulation Time = 2.19466 seconds for 20000 particles.
+ # parts 40000 # nodes 2 # threads 2
+Simulation Time = 2.2453 seconds for 40000 particles.
+ # parts 80000 # nodes 1 # threads 8
+Simulation Time = 2.33016 seconds for 80000 particles.
+ # parts 160000 # nodes 2 # threads 8
+Simulation Time = 2.6211 seconds for 160000 particles.
+ # parts 160001 # nodes 1 # threads 16
+Simulation Time = 2.85649 seconds for 160001 particles.
+ # parts 320000 # nodes 2 # threads 16
+Simulation Time = 3.35284 seconds for 320000 particles.
+ # parts 320001 # nodes 1 # threads 32
+Simulation Time = 3.57033 seconds for 320001 particles.
+ # parts 640000 # nodes 1 # threads 64
+Simulation Time = 5.21016 seconds for 640000 particles.
+ # parts 1280000 # nodes 2 # threads 64
+Simulation Time = 8.80226 seconds for 1280000 particles.
+ # parts 1280001 # nodes 1 # threads 128
+Simulation Time = 7.13205 seconds for 1280001 particles.
+ # parts 2560000 # nodes 2 # threads 128
+Simulation Time = 16.1708 seconds for 2560000 particles.
+ # parts 2560001 # nodes 1 # threads 256
+Simulation Time = 39.5396 seconds for 2560001 particles.
