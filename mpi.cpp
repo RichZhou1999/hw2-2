@@ -415,18 +415,6 @@ void send_recv_upper_particles(int rank, int num_procs) {
                  rank-1,
                  1,
                  MPI_COMM_WORLD);
-        MPI_Send(&num_ghost_particles_to_upper,
-                 1,
-                 MPI_INT,
-                 rank-1,
-                 0,
-                 MPI_COMM_WORLD);
-        MPI_Send(&ghost_particles_to_upper[0],
-                 num_ghost_particles_to_upper,
-                 PARTICLE,
-                 rank-1,
-                 0,
-                 MPI_COMM_WORLD);
     }
     if(rank != (num_procs -1)){
         MPI_Recv(&particle_possible_coming_in_lower_num,
@@ -442,21 +430,6 @@ void send_recv_upper_particles(int rank, int num_procs) {
                  PARTICLE,
                  rank+1,
                  1,
-                 MPI_COMM_WORLD,
-                 MPI_STATUS_IGNORE);
-        MPI_Recv(&num_ghost_particles_from_lower,
-                 1,
-                 MPI_INT,
-                 rank+1,
-                 0,
-                 MPI_COMM_WORLD,
-                 MPI_STATUS_IGNORE);
-        ghost_particles_from_lower.resize(num_ghost_particles_from_lower);
-        MPI_Recv(&ghost_particles_from_lower[0],
-                 num_ghost_particles_from_lower,
-                 PARTICLE,
-                 rank+1,
-                 0,
                  MPI_COMM_WORLD,
                  MPI_STATUS_IGNORE);
     }  
@@ -476,18 +449,6 @@ void send_recv_lower_particles(int rank, int num_procs) {
                  rank+1,
                  1,
                  MPI_COMM_WORLD);
-        MPI_Send(&num_ghost_particles_to_lower,
-                 1,
-                 MPI_INT,
-                 rank+1,
-                 0,
-                 MPI_COMM_WORLD);
-        MPI_Send(&ghost_particles_to_lower[0],
-                 num_ghost_particles_to_lower,
-                 PARTICLE,
-                 rank+1,
-                 0,
-                 MPI_COMM_WORLD);
     }
     if(rank != 0){
         MPI_Recv(&particle_possible_coming_in_upper_num,
@@ -503,21 +464,6 @@ void send_recv_lower_particles(int rank, int num_procs) {
                  PARTICLE,
                  rank-1,
                  1,
-                 MPI_COMM_WORLD,
-                 MPI_STATUS_IGNORE);
-        MPI_Recv(&num_ghost_particles_from_upper,
-                 1,
-                 MPI_INT,
-                 rank-1,
-                 0,
-                 MPI_COMM_WORLD,
-                 MPI_STATUS_IGNORE);
-        ghost_particles_from_upper.resize(num_ghost_particles_from_upper);
-        MPI_Recv(&ghost_particles_from_upper[0],
-                 num_ghost_particles_from_upper,
-                 PARTICLE,
-                 rank-1,
-                 0,
                  MPI_COMM_WORLD,
                  MPI_STATUS_IGNORE);
     }   
