@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <mpi.h>
+#include <vector>
 
 // Program Constants
 #define nsteps   1000
@@ -23,6 +24,20 @@ typedef struct particle_t {
     double ax;   // Acceleration X
     double ay;   // Acceleration Y
 } particle_t;
+
+typedef struct message_container_t {
+int particle_going_out_num;
+std::vector<particle_t> particle_going_out;
+
+int particle_possible_coming_in_num;
+std::vector<particle_t> particle_possible_coming_in;
+
+int num_ghost_particles_coming_in;
+std::vector<particle_t> ghost_particles_coming_in;
+
+int num_ghost_particles_going_out;
+std::vector<particle_t> ghost_particles_going_out;
+} message_container_t;
 
 extern MPI_Datatype PARTICLE;
 
