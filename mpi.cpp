@@ -1,4 +1,12 @@
 /*
+NEED TO FIX THIS
+Note per 280223:
+- I have changed the order in the send/recv messages which might have
+  ruined the (important?) order of the communication, i.e. a message must
+  be sent from a bin first to be received at the adjacent bin.
+
+
+
 The idea of this mpi code:
     -- split the whole region into sub regions. The number of subregions
     is equal to the number of threads given. Each region has the width of
