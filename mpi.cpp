@@ -92,7 +92,19 @@ int calculate_bin_number(double x, double y, double size, double bin_size, int r
 
 }
 
-void update_boundary_particles(){
+// Helper function that works if particle is in bin
+int calculate_if_edge(double y, double size){
+    if ((y - upper_boundary) < cutoff){
+        return 1; // In upper edge
+    }
+    if ((lower_boundary - y) <= cutoff){
+        return -1; // In lower edge
+    }
+    return 0;
+}
+
+
+void update_boundary_particles(double size){
     ghost_particles_to_upper.clear();
     num_ghost_particles_to_upper = 0;
     ghost_particles_to_lower.clear();
@@ -100,16 +112,25 @@ void update_boundary_particles(){
 
     for(int i = 0; i < column_lda; i++){
         for (auto it = bins[i].begin(); it != bins[i].end(); ++it){
-            ghost_particles_to_upper.push_back(**it);
-            num_ghost_particles_to_upper += 1;
+            particle_t p = **it;
+            if (calculate_if_edge(p.y, size) == 1) {
+                ghost_particles_to_upper.push_back(p);
+                num_ghost_particles_to_upper += 1;
+            }
         }
         for (auto it = bins[i + (row_lda-2)*column_lda].begin(); it != bins[i+ (row_lda-2)*column_lda].end(); ++it){
-            ghost_particles_to_lower.push_back(**it);
-            num_ghost_particles_to_lower += 1;
+            particle_t p = **it;
+            if (calculate_if_edge(p.y, size) == -1) {
+                ghost_particles_to_lower.push_back(p);
+                num_ghost_particles_to_lower += 1;
+            }
         }
         for (auto it = bins[i + (row_lda-1)*column_lda].begin(); it != bins[i+ (row_lda-1)*column_lda].end(); ++it){
-            ghost_particles_to_lower.push_back(**it);
-            num_ghost_particles_to_lower += 1;
+            particle_t p = **it;
+            if (calculate_if_edge(p.y, size) == -1) {
+                ghost_particles_to_lower.push_back(p);
+                num_ghost_particles_to_lower += 1;
+            }
         }
     }
 }
@@ -503,8 +524,121 @@ void send_recv_lower_particles(int rank, int num_procs) {
 }
 
 void send_recv_particles(int rank, int num_procs) {
-    send_recv_lower_particles(rank, num_procs);
-    send_recv_upper_particles(rank, num_procs);
+    if(rank != (num_procs -1)){
+        MPI_Send(&particle_going_out_lower_num,
+                 1,
+                 MPI_INT,
+                 rank+1,
+                 0,
+                 MPI_COMM_WORLD);
+        // if (particle_going_out_lower_num != 0){
+        //     std::cout << "p"<<rank<<" send " << particle_going_out_lower_num << " to " << rank+1 << " step " << step << "\n";
+        // }
+        // std::cout << "p"<<rank<<" send " << particle_going_out_lower_num << "to" << rank+1<< "\n";
+    }
+    if (rank != 0){
+        MPI_Send(&particle_going_out_upper_num,
+                 1,
+                 MPI_INT,
+                 rank-1,
+                 0,
+                 MPI_COMM_WORLD);
+        // if (particle_going_out_upper_num != 0){
+        //     std::cout << "p"<<rank<<" send " << particle_going_out_upper_num << " to" << rank-1  << " step " << step << "\n";
+        // }
+        // std::cout << "p"<<rank<<" send " << particle_going_out_upper_num << "to" << rank-1<< "\n";
+    }
+
+
+    if(rank != (num_procs -1)){
+        MPI_Recv(&particle_possible_coming_in_lower_num,
+                 1,
+                 MPI_INT,
+                 rank+1,
+                 0,
+                 MPI_COMM_WORLD,
+                 MPI_STATUS_IGNORE);
+        // if (particle_possible_coming_in_lower_num !=0){
+        //     std::cout << "p"<<rank<<" recv " << particle_possible_coming_in_lower_num << " from " << rank+1 << " step " << step << "\n";
+        // }
+        // std::cout << "p"<<rank<<" recv " << particle_possible_coming_in_lower_num << "from" << rank+1<< "\n";
+    }
+    if(rank != 0){
+        MPI_Recv(&particle_possible_coming_in_upper_num,
+                 1,
+                 MPI_INT,
+                 rank-1,
+                 0,
+                 MPI_COMM_WORLD,
+                 MPI_STATUS_IGNORE);
+        // if(particle_possible_coming_in_upper_num != 0){
+        //     std::cout << "p"<<rank<<" recv " << particle_possible_coming_in_upper_num << " from " << rank-1<< " step " << step << "\n";
+        // }
+        // std::cout << "p"<<rank<<" recv " << particle_possible_coming_in_upper_num << "from" << rank-1<< "\n";
+    }
+
+    if(rank != (num_procs -1)){
+        MPI_Send(&particle_going_out_lower[0],
+                 particle_going_out_lower_num,
+                 PARTICLE,
+                 rank+1,
+                 1,
+                 MPI_COMM_WORLD);
+    }
+    if (rank != 0){
+        MPI_Send(&particle_going_out_upper[0],
+                 particle_going_out_upper_num,
+                 PARTICLE,
+                 rank-1,
+                 1,
+                 MPI_COMM_WORLD);
+    }
+
+    if(rank != (num_procs -1)){
+        particle_possible_coming_in_lower.resize(particle_possible_coming_in_lower_num);
+        MPI_Recv(&particle_possible_coming_in_lower[0],
+                 particle_possible_coming_in_lower_num,
+                 PARTICLE,
+                 rank+1,
+                 1,
+                 MPI_COMM_WORLD,
+                 MPI_STATUS_IGNORE);
+        // if (particle_possible_coming_in_lower.size()!=0){
+        //     std::cout << "p"<<rank<<" recv " << particle_possible_coming_in_lower.size() << " from " << rank+1<< " step " << step << "\n";
+        //     std::cout << "y" << particle_possible_coming_in_lower[0].y << " step " << step << "\n";
+        // }
+        // std::cout << "p"<<rank<<" recv " << particle_possible_coming_in_lower.size() << "from" << rank+1<< "\n";
+    }
+    if(rank != 0){
+        particle_possible_coming_in_upper.resize(particle_possible_coming_in_upper_num);
+        MPI_Recv(&particle_possible_coming_in_upper[0],
+                 particle_possible_coming_in_upper_num,
+                 PARTICLE,
+                 rank-1,
+                 1,
+                 MPI_COMM_WORLD,
+                 MPI_STATUS_IGNORE);
+        // if (particle_possible_coming_in_upper.size() != 0){
+        //     std::cout << "p"<<rank<<" recv " << particle_possible_coming_in_upper.size() << " from " << rank-1 << " step " << step << "\n";
+        //     std::cout << "y " << particle_possible_coming_in_upper[0].y << " step " << step << "\n";
+        // }
+        // std::cout << "p"<<rank<<" recv " << particle_possible_coming_in_upper.size() << "from" << rank-1 << "\n";
+        // std::cout << " --------------------------------------" << "\n";
+    }
+
+    // bins.clear();
+
+    // for( int i =0 ; i < row_lda; i++){
+    //     for( int j =0; j < column_lda; j++){
+    //         for (auto it = bins[j+i*column_lda].begin(); it != bins[j+i*column_lda].end(); ++it){
+    //             int index;
+    //             index = calculate_bin_number((*it)->x,(*it)->y, size, bin_size, row_lda, column_lda);
+    //             if(index != 1){
+    //                 bins[index].insert(*it);
+    //             }
+    //         }
+    //     }
+    // }
 }
 
 
@@ -559,7 +693,7 @@ void init_simulation(particle_t* parts, int num_parts, double size, int rank, in
     }
     // std::cout << "rank "<<rank<< "num" << number_particles_sending << "\n";
 
-    update_boundary_particles();
+    update_boundary_particles(size);
     send_recv_ghost_particles(rank, num_procs);
     // if(rank != (num_procs -1)){
     //     MPI_Send(&lower_boudary_particle_num,
@@ -755,10 +889,6 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
     particle_going_out_lower_num = 0;
     particle_going_out_upper.clear();
     particle_going_out_upper_num = 0;
-    particle_possible_coming_in_lower.clear();
-    particle_possible_coming_in_lower_num = 0;
-    particle_possible_coming_in_upper.clear();
-    particle_possible_coming_in_upper_num = 0;
 
     for( int i =0 ; i < row_lda; i++){
         for( int j =0; j < column_lda; j++){
@@ -800,12 +930,9 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
 
     flatten_particles.clear();
 
-    update_boundary_particles();
-    // send_recv_ghost_particles(rank, num_procs);
     // send_recv_particles(rank, num_procs);
     send_recv_upper_particles(rank, num_procs);
     send_recv_lower_particles(rank, num_procs);
-
 
     for (auto it = particle_possible_coming_in_upper.begin(); it != particle_possible_coming_in_upper.end(); ++it) {
         particle_t* temp = new particle_t;
@@ -840,6 +967,13 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
             bins[index].insert(temp);
         }
     }
+
+    particle_possible_coming_in_lower.clear();
+    particle_possible_coming_in_lower_num = 0;
+    particle_possible_coming_in_upper.clear();
+    particle_possible_coming_in_upper_num = 0;
+    update_boundary_particles(size);
+    send_recv_ghost_particles(rank, num_procs);
 
 }
 
