@@ -324,40 +324,36 @@ void send_recv_boundary_particles(int rank , int num_procs){
 	IN comm communicator (handle)
 	OUT status status object (status)
 	*/
-	if(rank != (num_procs -1))
-	{
-		// send particle number
-        MPI_Send(&lower_boundary_particle_num, 1, MPI_INT, rank+1, 0, MPI_COMM_WORLD);
-		// send particle from lower boundary
-        MPI_Send(&particle_lower_boundary[0], lower_boundary_particle_num, PARTICLE, rank+1, 0, MPI_COMM_WORLD);
-    }
+	// if rank not at upper domain boundary
     if(rank != 0)
 	{
-        // recv particle number crossing upper bound 
+       // send particle number upper boundary
+        MPI_Send(&upper_boundary_particle_num,        1, MPI_INT, rank-1, 0, MPI_COMM_WORLD);
+        // send particles upper boundary
+		MPI_Send(&particle_upper_boundary[0], upper_boundary_particle_num, PARTICLE, 
+		         rank-1, 0, MPI_COMM_WORLD);
+	    // recv particle number crossing upper bound 
 		MPI_Recv(&particle_beyond_upper_boundary_num, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         particle_beyond_upper_boundary.resize(particle_beyond_upper_boundary_num);
         // recv particle crossing upper bound
-		MPI_Recv(&particle_beyond_upper_boundary[0],  particle_beyond_upper_boundary_num, 
-		         PARTICLE, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-    }
-    if(rank != 0)
+		MPI_Recv(&particle_beyond_upper_boundary[0],  particle_beyond_upper_boundary_num, PARTICLE, 
+		         rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	}
+	// if rank not at lower domain boundary
+	if(rank != (num_procs -1))
 	{
-		// send particle number upper boundary
-        MPI_Send(&upper_boundary_particle_num, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD);
-        // send particles upper boundary
-		MPI_Send(&particle_upper_boundary[0], upper_boundary_particle_num, PARTICLE, rank-1, 0, MPI_COMM_WORLD);
-    }
-    if(rank != (num_procs -1))
-	{
+		// send particle number
+        MPI_Send(&lower_boundary_particle_num,        1, MPI_INT, rank+1, 0, MPI_COMM_WORLD);
+		// send particle from lower boundary
+        MPI_Send(&particle_lower_boundary[0],        lower_boundary_particle_num, PARTICLE, 
+		         rank+1, 0, MPI_COMM_WORLD);
 		// recv particle number lower boundary
         MPI_Recv(&particle_beyond_lower_boundary_num, 1, MPI_INT, rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         particle_beyond_lower_boundary.resize(particle_beyond_lower_boundary_num);
         // recv particles crossing lower boundary
 		MPI_Recv(&particle_beyond_lower_boundary[0], particle_beyond_lower_boundary_num, PARTICLE, 
 		         rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    }
-
+	}
 }
 void init_simulation(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
     if( (size/ num_procs / bin_size) < 1)
