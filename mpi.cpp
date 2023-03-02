@@ -649,6 +649,7 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
     // std::cout << "123" << "\n";
     number_particles_sending = 0;
     particle_send_gathering.clear();
+	print_map(bins);
     for( int i =0 ; i < row_lda; i++){
         for( int j =0; j < column_lda; j++){
             for (auto it = bins[j+i*column_lda].begin(); it != bins[j+i*column_lda].end(); ++it){
@@ -704,7 +705,6 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
             displacement[i] = number_particles_receiving_sum;
             number_particles_receiving_sum += number_particles_receiving[i];
         }
-        print_map(bins);
         std::cout << "--------------------------------\n\n # Particles : " << number_particles_receiving_sum << " step "<< step <<"\n ----------------------------- \n\n";
         MPI_Gatherv(&particle_send_gathering[0],
 
