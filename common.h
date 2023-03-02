@@ -29,8 +29,8 @@ typedef struct message_container_t {
 int particle_going_out_num;
 std::vector<particle_t> particle_going_out;
 
-int particle_possible_coming_in_num;
-std::vector<particle_t> particle_possible_coming_in;
+int particle_coming_in_num;
+std::vector<particle_t> particle_coming_in;
 
 int num_ghost_particles_coming_in;
 std::vector<particle_t> ghost_particles_coming_in;
