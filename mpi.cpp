@@ -46,10 +46,10 @@ std::vector<message_container_t> message_containers;
 // std::vector<particle_t> particle_going_out_upper;
 // int particle_going_out_lower_num;
 // std::vector<particle_t> particle_going_out_lower;
-// int particle_possible_coming_in_upper_num;
-// std::vector<particle_t> particle_possible_coming_in_upper;
-// int particle_possible_coming_in_lower_num;
-// std::vector<particle_t> particle_possible_coming_in_lower;
+// int particle_coming_in_upper_num;
+// std::vector<particle_t> particle_coming_in_upper;
+// int particle_coming_in_lower_num;
+// std::vector<particle_t> particle_coming_in_lower;
 
 // // Ghost Particle Structures
 // int num_ghost_particles_from_upper;
@@ -115,12 +115,13 @@ int calculate_if_edge(double y, double size){
 
 
 void update_boundary_particles(double size){
-    for (auto container: message_containers) {
+    // reset container for ghost particles
+	for (auto container: message_containers) {
         container.ghost_particles_going_out.clear();
         container.num_ghost_particles_going_out = 0;
     }
+    // push back the particles within interaction range of particles in the adjacent cells
     int rows_to_check[] = {0, row_lda - 2, row_lda - 1};
-
     for (auto row: rows_to_check) {
         for(int i = 0; i < column_lda; i++){
             for (auto it = bins[i + row*column_lda].begin(); it != bins[i].end(); ++it){
@@ -394,16 +395,16 @@ void recv_particles(int rank, int num_procs, int container_ind, int rank_diff) {
     auto container = message_containers.at(container_ind);
     auto other_rank = rank + rank_diff;
     if (!check_if_ranks_fit(other_rank, num_procs)) return;
-    MPI_Recv(&container.particle_possible_coming_in_num,
+    MPI_Recv(&container.particle_coming_in_num,
                 1,
                 MPI_INT,
                 other_rank,
                 0,
                 MPI_COMM_WORLD,
                 MPI_STATUS_IGNORE);
-    container.particle_possible_coming_in.resize(container.particle_possible_coming_in_num);
-    MPI_Recv(&container.particle_possible_coming_in[0],
-                container.particle_possible_coming_in_num,
+    container.particle_coming_in.resize(container.particle_coming_in_num);
+    MPI_Recv(&container.particle_coming_in[0],
+                container.particle_coming_in_num,
                 PARTICLE,
                 other_rank,
                 1,
@@ -551,8 +552,8 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
     generate_particle_beyond_boundary_bins();
     // Write this function
     for (auto container: message_containers) {
-        container.particle_possible_coming_in.clear();
-        container.particle_possible_coming_in_num = 0;
+        container.particle_coming_in.clear();
+        container.particle_coming_in_num = 0;
         container.particle_going_out.clear();
         container.particle_going_out_num = 0;
     }
@@ -601,7 +602,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
     send_recv_particles(rank, num_procs);
 
     for (auto container: message_containers) {
-        for (auto it = container.particle_possible_coming_in.begin(); it != container.particle_possible_coming_in.end(); ++it) {
+        for (auto it = container.particle_coming_in.begin(); it != container.particle_coming_in.end(); ++it) {
             particle_t* temp = new particle_t;
             temp -> id = (*it).id;
             temp -> x = (*it).x;
@@ -617,8 +618,8 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
                 bins[index].insert(temp);
             }  
         }
-        container.particle_possible_coming_in.clear();
-        container.particle_possible_coming_in_num = 0;
+        container.particle_coming_in.clear();
+        container.particle_coming_in_num = 0;
     }
 
     update_boundary_particles(size);
@@ -691,7 +692,7 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
         }
         std::cout << number_particles_receiving_sum << " step "<< step << "\n";
 
-        MPI_Gatherv(&particle_send_gathering[0],
+        /*MPI_Gatherv(&particle_send_gathering[0],
                     number_particles_sending,
                     PARTICLE,
                     &particle_receive_gathering[0],
@@ -702,9 +703,9 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
                     MPI_COMM_WORLD);
         for( int i =0; i < num_parts; i++){
             parts[particle_receive_gathering[i].id-1] = particle_receive_gathering[i];
-        }
+        }*/
     }
-    else{
+    /*else{
         MPI_Gatherv(&particle_send_gathering[0],
                     number_particles_sending,
                     PARTICLE,
@@ -714,6 +715,6 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
                     PARTICLE,
                     0,
                     MPI_COMM_WORLD);
-    }
+    }*/
 
 }
