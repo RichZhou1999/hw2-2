@@ -86,8 +86,9 @@ void print_map(std::unordered_map<int, std::unordered_set<particle_t *>> const &
         std::cout << "Bin : " << pair.first << "\n";
 			for(auto const &parts : pair.second)
 			{
-			std::cout << "p_id : " << parts->id << "\n";
+			std::cout << "p_id : " << parts->id << " ";
 			}
+			std::cout << "\n";
 	}
 }
 
@@ -703,8 +704,8 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
             displacement[i] = number_particles_receiving_sum;
             number_particles_receiving_sum += number_particles_receiving[i];
         }
-        std::cout << number_particles_receiving_sum << " step "<< step << "\n";
         print_map(bins);
+        std::cout << "--------------------------------\n\n # Particles : " << number_particles_receiving_sum << " step "<< step <<"\n ----------------------------- \n\n";
         MPI_Gatherv(&particle_send_gathering[0],
 
                     number_particles_sending,
@@ -718,6 +719,11 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
         for( int i =0; i < num_parts; i++){
             parts[particle_receive_gathering[i].id-1] = particle_receive_gathering[i];
         }
+		for( int i = 0; i < num_parts; ++i){
+			std::cout << parts[i].id << " ";
+			if( !( (i + 1) % 100)){std::cout << "\n";}
+		}
+		std::cout << "\n";
     }
     else{
         MPI_Gatherv(&particle_send_gathering[0],
