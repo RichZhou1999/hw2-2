@@ -389,7 +389,7 @@ void send_particles(int rank, int num_procs, int container_ind, int rank_diff) {
                 other_rank,
                 1,
                 MPI_COMM_WORLD);
-	std::cout << "Send - P : " << rank << " incoming " << container.particle_coming_in_num << " from " << other_rank << "\n";
+	//std::cout << "Send - P : " << rank << " incoming " << container.particle_coming_in_num << " from " << other_rank << "\n";
 }
 
 void recv_particles(int rank, int num_procs, int container_ind, int rank_diff) {
@@ -411,7 +411,7 @@ void recv_particles(int rank, int num_procs, int container_ind, int rank_diff) {
                 1,
                 MPI_COMM_WORLD,
                 MPI_STATUS_IGNORE);
-	std::cout << "Recv - P : " << rank << " incoming " << container.particle_coming_in_num << " from " << other_rank << "\n";
+	//std::cout << "Recv - P : " << rank << " incoming " << container.particle_coming_in_num << " from " << other_rank << "\n";
 }
 
 void send_recv_particles(int rank, int num_procs) {
@@ -693,7 +693,8 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
         }
         std::cout << number_particles_receiving_sum << " step "<< step << "\n";
 
-        /*MPI_Gatherv(&particle_send_gathering[0],
+        MPI_Gatherv(&particle_send_gathering[0],
+
                     number_particles_sending,
                     PARTICLE,
                     &particle_receive_gathering[0],
@@ -704,9 +705,9 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
                     MPI_COMM_WORLD);
         for( int i =0; i < num_parts; i++){
             parts[particle_receive_gathering[i].id-1] = particle_receive_gathering[i];
-        }*/
+        }
     }
-    /*else{
+    else{
         MPI_Gatherv(&particle_send_gathering[0],
                     number_particles_sending,
                     PARTICLE,
@@ -716,6 +717,6 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
                     PARTICLE,
                     0,
                     MPI_COMM_WORLD);
-    }*/
+    }
 
 }
