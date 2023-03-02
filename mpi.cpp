@@ -739,8 +739,8 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
 	{
             for (auto it = bins[j+i*column_lda].begin(); it != bins[j+i*column_lda].end(); ++it)
 	    {
-                // particle_t* ptr = *it;
-                particle_send_gathering.push_back(**it);
+                particle_t p = **it;
+                particle_send_gathering.push_back(p);
                 //std::cout << " Gathered pid : " << (**it).id << "\n";
 		number_particles_sending+=1;
             }
@@ -803,7 +803,8 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
                     0,
                     MPI_COMM_WORLD);
         for( int i =0; i < num_parts; i++){
-            parts[particle_receive_gathering[i].id-1] = particle_receive_gathering[i];
+            // set particles[pid-1] = pid (sorting)
+	    parts[particle_receive_gathering[i].id-1] = particle_receive_gathering[i];
         }
 	/*for( int i = 0; i < num_parts; ++i){
 	  std::cout << parts[i].id << " ";
