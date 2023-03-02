@@ -649,13 +649,15 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
     // std::cout << "123" << "\n";
     number_particles_sending = 0;
     particle_send_gathering.clear();
-	print_map(bins);
+    //print_map(bins);
+    std::cout << " Sizeof bins : " << sizeof(bins) << "\n";
     for( int i =0 ; i < row_lda; i++){
         for( int j =0; j < column_lda; j++){
             for (auto it = bins[j+i*column_lda].begin(); it != bins[j+i*column_lda].end(); ++it){
                 // particle_t* ptr = *it;
                 particle_send_gathering.push_back(**it);
-                number_particles_sending+=1;
+                std::cout << " Gathered pid : " << (**it).id << "\n";
+		number_particles_sending+=1;
             }
         }
     }
@@ -707,7 +709,6 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
         }
         std::cout << "--------------------------------\n\n # Particles : " << number_particles_receiving_sum << " step "<< step <<"\n ----------------------------- \n\n";
         MPI_Gatherv(&particle_send_gathering[0],
-
                     number_particles_sending,
                     PARTICLE,
                     &particle_receive_gathering[0],
@@ -719,11 +720,11 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
         for( int i =0; i < num_parts; i++){
             parts[particle_receive_gathering[i].id-1] = particle_receive_gathering[i];
         }
-		for( int i = 0; i < num_parts; ++i){
-			std::cout << parts[i].id << " ";
-			if( !( (i + 1) % 100)){std::cout << "\n";}
-		}
-		std::cout << "\n";
+	/*for( int i = 0; i < num_parts; ++i){
+	  std::cout << parts[i].id << " ";
+	  if( !( (i + 1) % 100)){std::cout << "\n";}
+	}
+	std::cout << "\n";*/
     }
     else{
         MPI_Gatherv(&particle_send_gathering[0],
