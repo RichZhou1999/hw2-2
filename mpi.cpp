@@ -389,7 +389,7 @@ void send_particles(int rank, int num_procs, int container_ind, int rank_diff) {
                 other_rank,
                 1,
                 MPI_COMM_WORLD);
-	std::cout << "Recv - P : " << rank << " incoming " << container.particle_coming_in_num << " from " << other_rank << "\n";
+	std::cout << "Send - P : " << rank << " incoming " << container.particle_coming_in_num << " from " << other_rank << "\n";
 }
 
 void recv_particles(int rank, int num_procs, int container_ind, int rank_diff) {
