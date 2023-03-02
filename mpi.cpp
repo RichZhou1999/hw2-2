@@ -79,6 +79,18 @@ int step = 0;
 // Put any static global variables here that you will use throughout the simulation.
 
 
+void print_map(std::unordered_map<int, std::unordered_set<particle_t *>> const &m)
+{
+    for (auto const &pair: m) 
+	{
+        std::cout << "Bin : " << pair.first << "\n";
+			for(auto const &parts : pair.second)
+			{
+			std::cout << "p_id : " << parts->id << "\n";
+			}
+	}
+}
+
 int calculate_bin_number(double x, double y, double size, double bin_size, int row_lda, int column_lda){
     if ((y < upper_boundary)){
         // Upper neighbor
@@ -692,7 +704,7 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
             number_particles_receiving_sum += number_particles_receiving[i];
         }
         std::cout << number_particles_receiving_sum << " step "<< step << "\n";
-
+        print_map(bins);
         MPI_Gatherv(&particle_send_gathering[0],
 
                     number_particles_sending,
