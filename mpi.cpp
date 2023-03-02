@@ -389,6 +389,7 @@ void send_particles(int rank, int num_procs, int container_ind, int rank_diff) {
                 other_rank,
                 1,
                 MPI_COMM_WORLD);
+	std::cout << "Recv - P : " << rank << " incoming " << container.particle_coming_in_num << " from " << other_rank << "\n";
 }
 
 void recv_particles(int rank, int num_procs, int container_ind, int rank_diff) {
@@ -410,6 +411,7 @@ void recv_particles(int rank, int num_procs, int container_ind, int rank_diff) {
                 1,
                 MPI_COMM_WORLD,
                 MPI_STATUS_IGNORE);
+	std::cout << "Recv - P : " << rank << " incoming " << container.particle_coming_in_num << " from " << other_rank << "\n";
 }
 
 void send_recv_particles(int rank, int num_procs) {
@@ -600,7 +602,6 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
 
     // send_recv_particles(rank, num_procs);
     send_recv_particles(rank, num_procs);
-
     for (auto container: message_containers) {
         for (auto it = container.particle_coming_in.begin(); it != container.particle_coming_in.end(); ++it) {
             particle_t* temp = new particle_t;
@@ -688,7 +689,7 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
         displacement.resize(num_procs);
         for(int i = 0; i < num_procs; i++){
             displacement[i] = number_particles_receiving_sum;
-            number_particles_receiving_sum = number_particles_receiving_sum + number_particles_receiving[i];
+            number_particles_receiving_sum += number_particles_receiving[i];
         }
         std::cout << number_particles_receiving_sum << " step "<< step << "\n";
 
