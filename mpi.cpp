@@ -404,7 +404,13 @@ void send_recv_particles(int rank, int num_procs) {
 }
 
 void init_simulation(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
-    if(num_parts <= 10000){rank = 0;}
+    //if(num_parts <= 10000){rank = 0;}
+	if(num_parts<=parts_thresh && rank != 0)
+	{
+		MPI_Request req;
+		MPI_Ibarrier(MPI_COMM_WORLD, &req);
+		MPI_Wait(&req, MPI_STATUS_IGNORE);
+	}
     if ((size / num_procs/bin_size) < 1){
         bin_size = cutoff;
     }
@@ -531,7 +537,13 @@ void generate_particle_beyond_boundary_bins(){
 }
 
 void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
-    if(num_parts <= 10000){rank = 0;}
+    //if(num_parts <= 10000){rank = 0;}
+	if(num_parts<=parts_thresh && rank != 0)
+    {
+        MPI_Request req;
+        MPI_Ibarrier(MPI_COMM_WORLD, &req);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
+    }
 	step += 1;
     generate_particle_beyond_boundary_bins();
     // Write this function
@@ -603,12 +615,12 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
         container->particle_coming_in.clear();
         container->particle_coming_in_num = 0;
     }
-	//update_boundary_particles(size);
+	update_boundary_particles(size);
     // auto upper_edge_paticles = message_containers.at(0) -> num_ghost_particles_going_out;
     // auto lower_edge_paticles = message_containers.at(1) -> num_ghost_particles_going_out;
     // std::cout << "rank: " << rank << "upper edge particles: "<<  upper_edge_paticles << "\n";
     // std::cout << "rank: " << rank << "lower edge particles: "<<  lower_edge_paticles << "\n";
-    //send_recv_ghost_particles(rank, num_procs);
+    send_recv_ghost_particles(rank, num_procs);
 
 }
 
