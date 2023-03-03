@@ -3,6 +3,8 @@
 
 #include <cstdint>
 #include <mpi.h>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 // Program Constants
@@ -37,6 +39,8 @@ typedef struct message_container_t {
 
     int num_ghost_particles_going_out;
     std::vector<particle_t> ghost_particles_going_out;
+    // Ghost Particle Structures
+    std::unordered_map<int, std::unordered_set<particle_t *>> ghost_particles_bins;
 } message_container_t;
 
 extern MPI_Datatype PARTICLE;

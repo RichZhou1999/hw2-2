@@ -41,10 +41,6 @@ message_container_t upper_container;
 message_container_t lower_container;
 std::vector<message_container_t*> message_containers;
 
-// // Ghost Particle Structures
-std::unordered_map<int, std::unordered_set<particle_t *>> ghost_particles_upper_bins;
-std::unordered_map<int, std::unordered_set<particle_t *>> ghost_particles_lower_bins;
-
 
 std::vector<particle_t *> flatten_particles;
 
@@ -237,22 +233,23 @@ void apply_force_bin_upper_boundary(int row, int column, int row2, int column2){
     if (!check_boundary(row, column) && !check_boundary(row2, column2)){
         return;
     }
+    auto upper_container = message_containers.at(0);
     if(column != 0){
-        for (auto it2 = ghost_particles_upper_bins[column-1].begin(); it2 != ghost_particles_upper_bins[column-1].end(); ++it2){
+        for (auto it2 = upper_container->ghost_particles_bins[column-1].begin(); it2 != upper_container->ghost_particles_bins[column-1].end(); ++it2){
             for (auto it = bins[column+row*column_lda].begin(); it != bins[column+row*column_lda].end(); ++it){
                 // Interact particles
                 apply_force_bi_direction(**it,**it2);
             }
         }
     }
-    for (auto it2 = ghost_particles_upper_bins[column].begin(); it2 != ghost_particles_upper_bins[column].end(); ++it2){
+    for (auto it2 = upper_container->ghost_particles_bins[column].begin(); it2 != upper_container->ghost_particles_bins[column].end(); ++it2){
         for (auto it = bins[column+row*column_lda].begin(); it != bins[column+row*column_lda].end(); ++it){
             // Interact particles
             apply_force_bi_direction(**it,**it2);
         }
     }
     if(column != (column_lda -1)){
-        for (auto it2 = ghost_particles_upper_bins[column+1].begin(); it2 != ghost_particles_upper_bins[column+1].end(); ++it2){
+        for (auto it2 = upper_container->ghost_particles_bins[column+1].begin(); it2 != upper_container->ghost_particles_bins[column+1].end(); ++it2){
             for (auto it = bins[column+row*column_lda].begin(); it != bins[column+row*column_lda].end(); ++it){
                 // Interact particles
                 apply_force_bi_direction(**it,**it2);
@@ -267,22 +264,23 @@ void apply_force_bin_lower_boundary(int row, int column, int row2, int column2){
     if (!check_boundary(row, column) && !check_boundary(row2, column2)){
         return;
     }
+    auto lower_container = message_containers.at(1);
     if (column != 0){
-        for (auto it2 = ghost_particles_lower_bins[column-1].begin(); it2 != ghost_particles_lower_bins[column-1].end(); ++it2){
+        for (auto it2 = lower_container->ghost_particles_bins[column-1].begin(); it2 != lower_container->ghost_particles_bins[column-1].end(); ++it2){
             for (auto it = bins[column+row*column_lda].begin(); it != bins[column+row*column_lda].end(); ++it){
                 // Interact particles
                 apply_force_bi_direction(**it,**it2);
             }
         }
     }
-    for (auto it2 = ghost_particles_lower_bins[column].begin(); it2 != ghost_particles_lower_bins[column].end(); ++it2){
+    for (auto it2 = lower_container->ghost_particles_bins[column].begin(); it2 != lower_container->ghost_particles_bins[column].end(); ++it2){
         for (auto it = bins[column+row*column_lda].begin(); it != bins[column+row*column_lda].end(); ++it){
             // Interact particles
             apply_force_bi_direction(**it,**it2);
         }
     }
     if (column != (column_lda -1)){
-        for (auto it2 = ghost_particles_lower_bins[column+1].begin(); it2 != ghost_particles_lower_bins[column+1].end(); ++it2){
+        for (auto it2 = lower_container->ghost_particles_bins[column+1].begin(); it2 != lower_container->ghost_particles_bins[column+1].end(); ++it2){
             for (auto it = bins[column+row*column_lda].begin(); it != bins[column+row*column_lda].end(); ++it){
                 // Interact particles
                 apply_force_bi_direction(**it,**it2);
@@ -497,35 +495,40 @@ void update_flatten_particles(){
     }
 }
 
-void generate_particle_beyond_boundary_bins(){
+void generate_particle_beyond_boundary_bins(double size){
     const int space = ceil(1.5 * bin_size * bin_size * 1. / density);
-    for(int i = 0; i<column_lda; ++i){
-        ghost_particles_upper_bins[i].clear();
-        ghost_particles_upper_bins[i].reserve(space);
-        ghost_particles_lower_bins[i].clear();
-        ghost_particles_lower_bins[i].reserve(space);
+    for (auto container: message_containers) {
+        for (int i = 0; i < column_lda; ++i) {
+            container->ghost_particles_bins[i].clear();
+            container->ghost_particles_bins[i].reserve(space);
+        }   
     }
-    // int sum = 0;
-    auto upper_container = message_containers.at(0);
-    for (auto it = upper_container->ghost_particles_coming_in.begin(); it != upper_container->ghost_particles_coming_in.end(); ++it){
-        int index;
-        double quotient = ((*it).x)/bin_size;
-        index = int(quotient);
-        ghost_particles_upper_bins[index].insert(&(*it));
+
+    // Add all ghost particles coming in as ghost_particles
+    for (auto container: message_containers) {
+        for (auto it = container->ghost_particles_coming_in.begin(); it != container->ghost_particles_coming_in.end(); ++it){
+            int index;
+            double quotient = ((*it).x)/bin_size;
+            index = int(quotient);
+            container->ghost_particles_bins[index].insert(&(*it));
+        }
     }
-    // std::cout<<"sum"<<sum<<"\n";
-    auto lower_container = message_containers.at(1);
-    for (auto it = lower_container->ghost_particles_coming_in.begin(); it != lower_container->ghost_particles_coming_in.end(); ++it){
-        int index;
-        double quotient = ((*it).x)/bin_size;
-        index = int(quotient);
-        ghost_particles_lower_bins[index].insert(&(*it));
+    // Additionally, also consider all particles that just left as ghost particles
+    for (auto container: message_containers) {
+        for (auto it = container->particle_going_out.begin(); it != container->particle_going_out.end(); ++it) {
+            int index;
+            double quotient = ((*it).x)/bin_size;
+            index = int(quotient);
+            container->ghost_particles_bins[index].insert(&(*it));
+        }
     }
+
+
 }
 
 void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
     step += 1;
-    generate_particle_beyond_boundary_bins();
+    generate_particle_beyond_boundary_bins(size);
     // Write this function
     for (auto container: message_containers) {
         container->particle_possible_coming_in.clear();
@@ -573,8 +576,10 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
     flatten_particles.clear();
 
     // send_recv_particles(rank, num_procs);
+    update_boundary_particles(size);
     send_recv_particles(rank, num_procs);
-
+    send_recv_ghost_particles(rank, num_procs);
+    
     for (auto container: message_containers) {
         for (auto it = container->particle_possible_coming_in.begin(); it != container->particle_possible_coming_in.end(); ++it) {
             particle_t* temp = new particle_t;
@@ -595,13 +600,10 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
         container->particle_possible_coming_in.clear();
         container->particle_possible_coming_in_num = 0;
     }
-
-    update_boundary_particles(size);
     // auto upper_edge_paticles = message_containers.at(0) -> num_ghost_particles_going_out;
     // auto lower_edge_paticles = message_containers.at(1) -> num_ghost_particles_going_out;
     // std::cout << "rank: " << rank << "upper edge particles: "<<  upper_edge_paticles << "\n";
     // std::cout << "rank: " << rank << "lower edge particles: "<<  lower_edge_paticles << "\n";
-    send_recv_ghost_particles(rank, num_procs);
 
 }
 
