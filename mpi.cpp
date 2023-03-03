@@ -403,34 +403,8 @@ void send_recv_particles(int rank, int num_procs) {
     recv_particles(rank, num_procs, 0, -1);
 }
 
-void init_simulation_serial(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
-    row_lda = 1;
-    column_lda = 1;
-    const int space = ceil(1.5 * bin_size * bin_size * 1. / density);
-    for(int i = 0; i< row_lda*column_lda; ++i){
-        bins[i].reserve(space);
-    }
-
-    for (int i = 0; i < num_parts; ++i){
-        int index;
-        index = calculate_bin_number(parts[i].x,parts[i].y, size, bin_size, row_lda, column_lda);
-        if (index >= 0){
-            bins[index].insert(&parts[i]);
-        }
-    }
-
-    number_particles_sending = 0;
-    for( int i =0 ; i < row_lda; i++){
-        for( int j =0; j < column_lda; j++){
-            for (auto it = bins[j+i*column_lda].begin(); it != bins[j+i*column_lda].end(); ++it){
-                number_particles_sending+=1;
-            }
-        }
-    }
-}
-
-
-void init_simulation_mpi(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
+void init_simulation(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
+    if(num_parts <= 10000){rank = 0;}
     if ((size / num_procs/bin_size) < 1){
         bin_size = cutoff;
     }
@@ -474,15 +448,7 @@ void init_simulation_mpi(particle_t* parts, int num_parts, double size, int rank
     send_recv_ghost_particles(rank, num_procs);
 }
 
-void init_simulation(particle_t* parts, int num_parts, double size, int rank, int num_procs) 
-{
-	if(num_parts < 10000)
-	{
-		init_simulation_serial(parts, num_parts, size, rank, num_procs);
-	}
-	else init_simulation_mpi(parts, num_parts, size, rank, num_procs);
 
-}
 
 void apply_force_bins(int row, int column){
     // Create a matrix of force for each bin to bin
@@ -564,8 +530,9 @@ void generate_particle_beyond_boundary_bins(){
     }
 }
 
-void simulate_one_step_mpi(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
-    step += 1;
+void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
+    if(num_parts <= 10000){rank = 0;}
+	step += 1;
     generate_particle_beyond_boundary_bins();
     // Write this function
     for (auto container: message_containers) {
@@ -644,42 +611,6 @@ void simulate_one_step_mpi(particle_t* parts, int num_parts, double size, int ra
     //send_recv_ghost_particles(rank, num_procs);
 
 }
-
-
-void simulate_one_step_serial(particle_t* parts, int num_parts, double size) {
-    step += 1;
-	for( int i =0 ; i < row_lda; i++){
-        for( int j =0; j < column_lda; j++){
-            for (auto it = bins[j+i*column_lda].begin(); it != bins[j+i*column_lda].end(); ++it){
-                particle_t* ptr = *it;
-                ptr->ax = 0;
-                ptr->ay = 0;
-            }
-        }
-    }
-
-    for( int i =1 ; i < row_lda - 1; i++){
-        for( int j =0; j < column_lda; j++){
-            apply_force_bins(i, j);
-        }
-    }
-
-    update_flatten_particles();
-    for (auto it = flatten_particles.begin(); it != flatten_particles.end(); ++it) {
-        move(**it, size);
-    }
-
-    flatten_particles.clear();
-}
-
-void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, int num_procs){
-    if(num_parts < 10000)
-    {
-	simulate_one_step_serial(parts, num_parts, size);
-    }
-    else simulate_one_step_mpi(parts, num_parts, size, rank, num_procs);
-}
-
 
 void gather_for_save(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
     // Write this function such that at the end of it, the master (rank == 0)
