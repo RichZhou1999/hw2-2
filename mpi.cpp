@@ -397,6 +397,92 @@ void send_recv_particles(int rank, int num_procs) {
     recv_particles(rank, num_procs, 0, -1);
 }
 
+void send_all_particles(int rank, int num_procs, int container_ind, int rank_diff) {
+    auto container = message_containers.at(container_ind);
+    auto other_rank = rank + rank_diff;
+    if (!check_if_ranks_fit(other_rank, num_procs)) return;
+    MPI_Send(&container->particle_going_out_num,
+                1,
+                MPI_INT,
+                other_rank,
+                0,
+                MPI_COMM_WORLD);
+    MPI_Send(&container->num_ghost_particles_going_out,
+                1,
+                MPI_INT,
+                other_rank,
+                0,
+                MPI_COMM_WORLD);
+    // Combine vectors together
+    std::vector<particle_t> combo;
+    auto total_size = container->particle_going_out_num + container->num_ghost_particles_going_out;
+    combo.reserve(total_size);
+    combo.insert(combo.end(), container->particle_going_out.begin(), container->particle_going_out.end());
+    combo.insert(combo.end(), container->ghost_particles_going_out.begin(), container->ghost_particles_going_out.end());
+    // std::cout << "Rank: " << rank << " Other rank: " << other_rank << std::endl;
+    // std::cout << "Size 1: " << container->particle_going_out_num << std::endl;
+    // std::cout << "Size 2: " << container->num_ghost_particles_going_out << std::endl;
+    // std::cout << "Desired total size: " << total_size << std::endl;
+    // std::cout << "Actual total size: " << combo.size() << std::endl;
+    MPI_Send(&combo[0],
+                total_size,
+                PARTICLE,
+                other_rank,
+                1,
+                MPI_COMM_WORLD);
+}
+
+void recv_all_particles(int rank, int num_procs, int container_ind, int rank_diff) {
+    auto container = message_containers.at(container_ind);
+    auto other_rank = rank + rank_diff;
+    if (!check_if_ranks_fit(other_rank, num_procs)) return;
+    MPI_Recv(&container->particle_possible_coming_in_num,
+                1,
+                MPI_INT,
+                other_rank,
+                0,
+                MPI_COMM_WORLD,
+                MPI_STATUS_IGNORE);
+    MPI_Recv(&container->num_ghost_particles_coming_in,
+                1,
+                MPI_INT,
+                other_rank,
+                0,
+                MPI_COMM_WORLD,
+                MPI_STATUS_IGNORE);
+    std::vector<particle_t> combo;
+    auto total_size = container->particle_possible_coming_in_num + container->num_ghost_particles_coming_in;
+    combo.resize(total_size);
+    // std::cout << "Rank: " << rank << " Other rank: " << other_rank << std::endl;
+    // std::cout << "Size 1: " << container->particle_possible_coming_in_num << std::endl;
+    // std::cout << "Size 2: " << container->num_ghost_particles_coming_in << std::endl;
+    // std::cout << "Desired total size: " << total_size << std::endl;
+    MPI_Recv(&combo[0],
+                total_size,
+                PARTICLE,
+                other_rank,
+                1,
+                MPI_COMM_WORLD,
+                MPI_STATUS_IGNORE);
+    // std::cout << "Actual total size: " << combo.size() << std::endl;
+    // Now put into structures
+    container->particle_possible_coming_in.resize(container->particle_possible_coming_in_num);
+    container->ghost_particles_coming_in.resize(container->num_ghost_particles_coming_in);
+    container->particle_possible_coming_in.assign(combo.begin(), combo.begin() + container->particle_possible_coming_in_num);
+    container->ghost_particles_coming_in.assign(combo.begin() + container->particle_possible_coming_in_num, combo.end());
+}
+
+void send_recv_all_particles(int rank, int num_procs) {
+    // Send upper info to upper neighbor
+    send_all_particles(rank, num_procs, 0, -1);
+    // Receive lower info from lower neighbor
+    recv_all_particles(rank, num_procs, 1, 1);
+    // Send lower info to lower neighbor
+    send_all_particles(rank, num_procs, 1, 1);
+    // Receive upper info from upper neighbor
+    recv_all_particles(rank, num_procs, 0, -1);
+}
+
 void init_simulation(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
     if ((size / num_procs/bin_size) < 1){
         bin_size = cutoff;
@@ -577,9 +663,10 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
 
     // send_recv_particles(rank, num_procs);
     update_boundary_particles(size);
-    send_recv_particles(rank, num_procs);
-    send_recv_ghost_particles(rank, num_procs);
-    
+    // send_recv_particles(rank, num_procs);
+    // send_recv_ghost_particles(rank, num_procs);
+    send_recv_all_particles(rank, num_procs);
+
     for (auto container: message_containers) {
         for (auto it = container->particle_possible_coming_in.begin(); it != container->particle_possible_coming_in.end(); ++it) {
             particle_t* temp = new particle_t;
