@@ -564,7 +564,7 @@ void update_flatten_particles(){
         }
     }
 }
-
+// update GZs
 void generate_particle_beyond_boundary_bins(){
     const int space = ceil(1.5 * bin_size * bin_size * 1. / density);
     for(int i = 0; i<column_lda; ++i){
@@ -591,6 +591,7 @@ void generate_particle_beyond_boundary_bins(){
     }
 }
 
+
 void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
     step += 1;
     generate_particle_beyond_boundary_bins();
@@ -608,8 +609,11 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
     particle_going_out.clear();
     particle_going_out_num = 0;
     */
-    for( int i =0 ; i < row_lda; i++){
-        for( int j =0; j < column_lda; j++){
+    // reset acceleration to zero
+	for( int i =0 ; i < row_lda; i++)
+	{
+        for( int j =0; j < column_lda; j++)
+		{
             for (auto it = bins[j+i*column_lda].begin(); it != bins[j+i*column_lda].end(); ++it){
                 particle_t* ptr = *it;
                 ptr->ax = 0;
