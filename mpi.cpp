@@ -685,11 +685,11 @@ void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, 
     {
         if(rank == 0)
 		{
-			printf(" Simulate_one_step at step %i ", step);
+			//printf(" Rank %i serial simulation at step %i ", rank, step);
 			simulate_one_step_serial(parts, num_parts, size);
 			//MPI_Barrier(MPI_COMM_WORLD);
         } 
-		printf("Rank %i proc exits simulate_one_step at step %i \n", rank, step);
+		//printf("Rank %i proc exits simulate_one_step at step %i \n", rank, step);
 		return;
     }
     generate_particle_beyond_boundary_bins();
@@ -779,19 +779,9 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
     {
         if(rank == 0)
 		{
-			std::cout << "Gathering " << num_parts << " at step "<< step << "\n";
-			MPI_Gather(&num_parts,
-					1,
-					MPI_INT,
-					&parts[0],
-					1,
-					MPI_INT,
-					0,
-					MPI_COMM_WORLD);
-			if(step == nsteps){std::exit(0);}
+			std::cout << "Gathered " << num_parts << " at step "<< step << "\n";
 		}
-        //MPI_Barrier(MPI_COMM_WORLD);
-        printf(" %i parts / %i particles at threshold\n", num_parts, parts_thresh);
+        //printf(" %i parts / %i particles at threshold\n", num_parts, parts_thresh);
 		printf(" Rank %i proc exits gather_for_save at step %i \n", rank, step);
 		return;
     }
@@ -819,7 +809,6 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
                    MPI_INT,
                    0,
                    MPI_COMM_WORLD);
-
     }
 	else{
         MPI_Gather(&number_particles_sending,
