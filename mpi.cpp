@@ -137,7 +137,6 @@ void apply_force_one_direction(particle_t& particle, particle_t& neighbor) {
     double coef = (1 - cutoff / r) / r2 / mass;
     particle.ax += coef * dx;
     particle.ay += coef * dy;
-    // return std::make_tuple(coef * dx, coef * dy);
 }
 
 void apply_force_bi_direction(particle_t& particle, particle_t& neighbor) {
@@ -449,13 +448,18 @@ void init_simulation_serial(particle_t* parts, int num_parts, double size) {
 
 
 void init_simulation(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
-    if(num_parts <= parts_thresh && rank == 0)
+    if(num_parts <= parts_thresh)
     {
-        init_simulation_serial(parts, num_parts, size);
-		MPI_Barrier(MPI_COMM_WORLD);
+        if (rank == 0 )
+		{
+			printf(" Initializing serial sim at step %i ", step);
+			init_simulation_serial(parts, num_parts, size);
+			//MPI_Barrier(MPI_COMM_WORLD);
+        }
+        printf("Rank %i proc exits init_simulation at step %i\n", rank, step);
 		return;
     }
-	if ((size / num_procs/bin_size) < 1){
+    if ((size / num_procs/bin_size) < 1){
         bin_size = cutoff;
     }
     zone_size = size / num_procs;
@@ -677,10 +681,15 @@ void simulate_one_step_serial(particle_t* parts, int num_parts, double size) {
 
 void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
 	step += 1;
-	if(num_parts <= parts_thresh && rank == 0)
+	if(num_parts <= parts_thresh)
     {
-        simulate_one_step_serial(parts, num_parts, size);
-		MPI_Barrier(MPI_COMM_WORLD);
+        if(rank == 0)
+		{
+			printf(" Simulate_one_step at step %i ", step);
+			simulate_one_step_serial(parts, num_parts, size);
+			//MPI_Barrier(MPI_COMM_WORLD);
+        } 
+		printf("Rank %i proc exits simulate_one_step at step %i \n", rank, step);
 		return;
     }
     generate_particle_beyond_boundary_bins();
@@ -766,22 +775,26 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
     // Write this function such that at the end of it, the master (rank == 0)
     // processor has an in-order view of all particles. That is, the array
     // parts is complete and sorted by particle id.
-    if(num_parts <= parts_thresh && rank == 0)
+    if(num_parts <= parts_thresh)
     {
-		MPI_Gather(&num_parts,
-				1,
-				MPI_INT,
-				&parts[0],
-				1,
-				MPI_INT,
-				0,
-				MPI_COMM_WORLD);
-        std::cout << num_parts << " step "<< step << "\n";
-        MPI_Barrier(MPI_COMM_WORLD);
-        return;
+        if(rank == 0)
+		{
+			std::cout << "Gathering " << num_parts << " at step "<< step << "\n";
+			MPI_Gather(&num_parts,
+					1,
+					MPI_INT,
+					&parts[0],
+					1,
+					MPI_INT,
+					0,
+					MPI_COMM_WORLD);
+			if(step == nsteps){std::exit(0);}
+		}
+        //MPI_Barrier(MPI_COMM_WORLD);
+        printf(" %i parts / %i particles at threshold\n", num_parts, parts_thresh);
+		printf(" Rank %i proc exits gather_for_save at step %i \n", rank, step);
+		return;
     }
-
-
     number_particles_sending = 0;
     particle_send_gathering.clear();
     for( int i =0 ; i < row_lda; i++){
