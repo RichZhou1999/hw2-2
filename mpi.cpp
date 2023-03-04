@@ -405,12 +405,12 @@ void send_recv_particles(int rank, int num_procs) {
 
 void init_simulation(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
     //if(num_parts <= 10000){rank = 0;}
-	if(num_parts<=parts_thresh && rank != 0)
+	/*if(num_parts<=parts_thresh && rank != 0)
 	{
 		MPI_Request req;
 		MPI_Ibarrier(MPI_COMM_WORLD, &req);
 		MPI_Wait(&req, MPI_STATUS_IGNORE);
-	}
+	}*/
     if ((size / num_procs/bin_size) < 1){
         bin_size = cutoff;
     }
@@ -538,12 +538,12 @@ void generate_particle_beyond_boundary_bins(){
 
 void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
     //if(num_parts <= 10000){rank = 0;}
-	if(num_parts<=parts_thresh && rank != 0)
+	/*if(num_parts<=parts_thresh && rank != 0)
     {
         MPI_Request req;
         MPI_Ibarrier(MPI_COMM_WORLD, &req);
         MPI_Wait(&req, MPI_STATUS_IGNORE);
-    }
+    }*/
 	step += 1;
     generate_particle_beyond_boundary_bins();
     // Write this function
