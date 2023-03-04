@@ -16,6 +16,7 @@ The idea of this mpi code:
                                  */
 
 #include "common.h"
+//#include "serial.h"
 #include <mpi.h>
 #include <cmath>
 #include <set>
@@ -403,15 +404,58 @@ void send_recv_particles(int rank, int num_procs) {
     recv_particles(rank, num_procs, 0, -1);
 }
 
+// Integrate the ODE
+void move_serial(particle_t& p, double size) {
+    // Slightly simplified Velocity Verlet integration
+    // Conserves energy better than explicit Euler method
+    p.vx += p.ax * dt;
+    p.vy += p.ay * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+
+    // Bounce from walls
+    while (p.x < 0 || p.x > size) {
+        // evaluates to -px if px < 0, else 2 * size - px
+    p.x = p.x < 0 ? -p.x : 2 * size - p.x;
+        p.vx = -p.vx;
+    }
+
+    while (p.y < 0 || p.y > size) {
+        // evaluates to -py if py < 0, else 2 * size - py
+        p.y = p.y < 0 ? -p.y : 2 * size - p.y;
+        p.vy = -p.vy;
+    }
+}
+
+std::vector< std::vector<int> > pbins;
+int nbin_x;
+int nbin_y;
+
+void init_simulation_serial(particle_t* parts, int num_parts, double size) {
+    // You can use this space to initialize static, global data objects
+    // that you may need. This function will be called once before the
+    // algorithm begins. Do not do any particle simulation here
+    float tnbin = size/bin_size;
+    nbin_x = int(tnbin) + 1;
+    nbin_y = int(tnbin) + 1;
+    pbins.resize(nbin_x * nbin_y);
+    for(int i = 0; i < num_parts; ++i){
+        int j = int(parts[i].x / bin_size); // computes the horisontal index of the bin/subdomain
+        int k = int(parts[i].y / bin_size); // computes the vertical   index of the bin/subdomain
+        parts[i].ax = 0; parts[i].ay = 0;
+        pbins[j + k*nbin_x].push_back(i);     // adds the particle at the indices defined above to the bins, col-major order
+    }
+}
+
+
 void init_simulation(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
-    //if(num_parts <= 10000){rank = 0;}
-	/*if(num_parts<=parts_thresh && rank != 0)
-	{
-		MPI_Request req;
-		MPI_Ibarrier(MPI_COMM_WORLD, &req);
-		MPI_Wait(&req, MPI_STATUS_IGNORE);
-	}*/
-    if ((size / num_procs/bin_size) < 1){
+    if(num_parts <= parts_thresh && rank == 0)
+    {
+        init_simulation_serial(parts, num_parts, size);
+		MPI_Barrier(MPI_COMM_WORLD);
+		return;
+    }
+	if ((size / num_procs/bin_size) < 1){
         bin_size = cutoff;
     }
     zone_size = size / num_procs;
@@ -536,15 +580,109 @@ void generate_particle_beyond_boundary_bins(){
     }
 }
 
+
+void simulate_one_step_serial(particle_t* parts, int num_parts, double size) {
+  /* 
+   * init the particle bin
+   */
+  for (int j = 0; j < nbin_y; ++j){
+    for (int i = 0; i < nbin_x; ++i){
+      int ibin = i + j*nbin_x;
+      int size_currbin = pbins[ibin].size();
+      int currbin[size_currbin];
+      for(int k = 0; k < size_currbin; ++k){
+    // allocate the kth particle in bin Bij
+    currbin[k] = pbins[ibin][k];
+    int i_new = int(parts[ currbin[k] ].x / bin_size);
+    int j_new = int(parts[ currbin[k] ].y / bin_size);
+    // reset the accelerations
+    parts[currbin[k]].ax = 0; parts[currbin[k]].ay = 0;
+    // if particle have jumped bin
+    if(i != i_new || j != j_new){
+      // remove the kth particle from the bin
+      int move = pbins[ibin][k];
+      pbins[ibin].erase(pbins[ibin].begin() + k);
+      // update the iteration integer and upper bound
+      k -= 1;
+      size_currbin -= 1;
+      // add the kth particle to the bin it has moved to
+      pbins[i_new + j_new*nbin_x].push_back(move);
+    }
+      }
+    }
+
+  }
+  /*
+   * Compute forces moving to bins in col-major order
+   */
+
+  for (int j = 0; j < nbin_y; ++j){
+    for (int i = 0; i < nbin_x; ++i){
+      // create variable for current bin index
+      int curr_ibin = i + j*nbin_x;
+      int currbin_size = pbins[curr_ibin].size();
+      // jump to next iteration if size of bin is zero
+      if(currbin_size == 0){continue;}
+      // create variable for current bin
+      int currbin[currbin_size];
+      for(int idx = 0; idx < currbin_size; ++idx){currbin[idx] = pbins[curr_ibin][idx];}
+      // Neighbors {ne, e, se, s}
+      int ne = (i == 0        || j == nbin_y-1) ? -1 : curr_ibin - 1 + nbin_x;
+      int se = (i == nbin_x-1 || j == nbin_y-1) ? -1 : curr_ibin + 1 + nbin_x;
+      int s  = i == nbin_x-1 ? -1 : curr_ibin + 1;
+      int e  = j == nbin_y-1 ? -1 : curr_ibin + nbin_x;
+      int ineighs[4] = {ne, e, se, s};
+      // iterating over all particles in the (i + j*nbin)th bin
+      for(int ii = 0; ii < currbin_size; ++ii){
+    // particles within the same bin
+    particle_t parti = parts[currbin[ii]];
+    for(int jj = ii+1; jj < currbin_size; ++jj){
+      // Exploit symmetry of collisions by NIII
+      apply_force_one_direction(parti, parts[currbin[jj]]);
+      apply_force_one_direction(parts[currbin[jj]], parti);
+    }
+    // iterate over neighbors
+    for(int k = 0; k < 4; ++k){
+      // do not consider neighbors that has already been visited (ineighs[k] > i + j*nbin)
+      // skip if size of the neighboring bin is zero
+      // create var for bin index of k'th neighbour
+      if(ineighs[k] == -1){continue;}
+      int neigh_ps = ineighs[k];
+      int curr_neigh_size = pbins[neigh_ps].size();
+      if(pbins[neigh_ps].size() != 0 && neigh_ps < nbin_x*nbin_y && neigh_ps >= 0 && neigh_ps > curr_ibin){
+        // create var for k'th neighbor bin
+        int curr_neigh[curr_neigh_size];
+        for(int idx = 0; idx < curr_neigh_size; ++idx){curr_neigh[idx] = pbins[neigh_ps][idx];}
+
+        // iterating over the particles in the current bin
+        for(int kk = 0; kk < curr_neigh_size; ++kk){
+          // apply force between particle ii and the kth particle in neighbor bin
+          apply_force_one_direction(parti,   parts[curr_neigh[kk]]);
+          apply_force_one_direction(parts[curr_neigh[kk]], parti);
+        }
+      }
+
+    }
+    // write back to particle array for later use
+    parts[currbin[ii]] = parti;
+      }
+    }
+  }
+  // Move Particles
+  for (int i = 0; i < num_parts; ++i) {
+    move_serial(parts[i], size);
+  }
+}
+
+
 void simulate_one_step(particle_t* parts, int num_parts, double size, int rank, int num_procs) {
-    //if(num_parts <= 10000){rank = 0;}
-	/*if(num_parts<=parts_thresh && rank != 0)
-    {
-        MPI_Request req;
-        MPI_Ibarrier(MPI_COMM_WORLD, &req);
-        MPI_Wait(&req, MPI_STATUS_IGNORE);
-    }*/
 	step += 1;
+	if(num_parts <= parts_thresh && rank == 0)
+    {
+        simulate_one_step_serial(parts, num_parts, size);
+		MPI_Barrier(MPI_COMM_WORLD);
+		return;
+    }
     generate_particle_beyond_boundary_bins();
     // Write this function
     for (auto container: message_containers) {
@@ -628,8 +766,22 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
     // Write this function such that at the end of it, the master (rank == 0)
     // processor has an in-order view of all particles. That is, the array
     // parts is complete and sorted by particle id.
+    if(num_parts <= parts_thresh && rank == 0)
+    {
+		MPI_Gather(&num_parts,
+				1,
+				MPI_INT,
+				&parts[0],
+				1,
+				MPI_INT,
+				0,
+				MPI_COMM_WORLD);
+        std::cout << num_parts << " step "<< step << "\n";
+        MPI_Barrier(MPI_COMM_WORLD);
+        return;
+    }
 
-    // std::cout << "123" << "\n";
+
     number_particles_sending = 0;
     particle_send_gathering.clear();
     for( int i =0 ; i < row_lda; i++){
@@ -655,7 +807,8 @@ void gather_for_save(particle_t* parts, int num_parts, double size, int rank, in
                    0,
                    MPI_COMM_WORLD);
 
-    }else{
+    }
+	else{
         MPI_Gather(&number_particles_sending,
                    1,
                    MPI_INT,
