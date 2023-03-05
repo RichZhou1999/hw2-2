@@ -13,7 +13,7 @@
 #define cutoff   0.01
 #define min_r    (cutoff / 100)
 #define dt       0.0005
-#define parts_thresh 10000
+#define parts_thresh 50000
 // Particle Data Structure
 typedef struct particle_t {
     uint64_t id; // Particle ID
